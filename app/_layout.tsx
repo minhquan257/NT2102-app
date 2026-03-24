@@ -1,24 +1,115 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Ionicons } from "@expo/vector-icons";
+import {
+  DrawerContentComponentProps,
+  DrawerContentScrollView,
+  DrawerItem,
+  DrawerItemList,
+} from "@react-navigation/drawer";
+import { usePathname, useRouter } from "expo-router";
+import { Drawer } from "expo-router/drawer";
+import React from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  tinyLogo: {
+    width: 60,
+    height: 60,
+    alignSelf: "center",
+  },
+  logo: {
+    width: 66,
+    height: 58,
+  },
+});
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function CustomDrawerContent(props: DrawerContentComponentProps) {
+  const menuItems = [
+    {
+      id: 42,
+      title: "Item 42",
+    },
+    {
+      id: 43,
+      title: "Item 43",
+    },
+    {
+      id: 44,
+      title: "Item 44",
+    },
+  ];
+  const router = useRouter();
+  const pathName = usePathname();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <DrawerContentScrollView {...props}>
+      <Image
+        style={styles.tinyLogo}
+        source={require("@/assets/images/react-logo.png")}
+      />
+      <DrawerItemList {...props} />
+      <View style={{ padding: 16, paddingTop: 40 }}>
+        <Text style={{ fontSize: 16, fontWeight: "bold" }}>Items</Text>
+      </View>
+      {menuItems.map((item) => {
+        const isActive = pathName === `/${item.id}`;
+        return (
+          <DrawerItem
+            focused={isActive}
+            key={item.id}
+            label={item.title}
+            onPress={() => {
+              router.push(`/${item.id}`);
+            }}
+          />
+        );
+      })}
+    </DrawerContentScrollView>
+  );
+}
+
+export default function Layout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Drawer
+        drawerContent={CustomDrawerContent}
+        screenOptions={{
+          drawerActiveTintColor: "blue",
+          drawerHideStatusBarOnOpen: true,
+        }}
+      >
+        <Drawer.Screen
+          name="index" // This is the name of the page and must match the url from root
+          options={{
+            drawerLabel: "Home",
+            title: "Home",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="news"
+          options={{
+            drawerLabel: "News",
+            title: "News",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="newspaper" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="[id]"
+          options={{
+            drawerItemStyle: {
+              display: "none",
+            },
+          }}
+        />
+      </Drawer>
+    </GestureHandlerRootView>
   );
 }
