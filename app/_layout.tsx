@@ -77,18 +77,30 @@ export default function Layout() {
       <Drawer
         drawerContent={CustomDrawerContent}
         screenOptions={{
+          drawerStyle: {
+            backgroundColor: "#ccc", // 👈 màu nền
+          },
+          drawerActiveBackgroundColor: "#e6f7ff",
           drawerActiveTintColor: "blue",
           drawerHideStatusBarOnOpen: true,
         }}
       >
         <Drawer.Screen
-          name="index" // This is the name of the page and must match the url from root
+          name="scene1" // This is the name of the page and must match the url from root
           options={{
-            drawerLabel: "Home",
-            title: "Home",
+            drawerLabel: "Disable passcode rate limit",
+            title: "Disable passcode rate limit",
             drawerIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
+              <Ionicons name={"lock-open"} size={size} color={color} />
             ),
+            headerTitleStyle: {
+              color: "#888", // 👈 xám đậm
+              fontWeight: "600",
+            },
+            drawerLabelStyle: {
+              color: "#888", // 👈 xám đậm
+              fontSize: 14,
+            },
           }}
         />
         <Drawer.Screen
@@ -99,6 +111,14 @@ export default function Layout() {
             drawerIcon: ({ color, size }) => (
               <Ionicons name="newspaper" size={size} color={color} />
             ),
+            headerTitleStyle: {
+              color: "#888", // 👈 xám đậm
+              fontWeight: "600",
+            },
+            drawerLabelStyle: {
+              color: "#888", // 👈 xám đậm
+              fontSize: 14,
+            },
           }}
         />
         <Drawer.Screen
