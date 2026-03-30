@@ -104,10 +104,10 @@ export default function Layout() {
           }}
         />
         <Drawer.Screen
-          name="news"
+          name="scene2"
           options={{
-            drawerLabel: "News",
-            title: "News",
+            drawerLabel: "Plaintext password in SharedPreferences",
+            title: "Plaintext password in SharedPreferences",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="newspaper" size={size} color={color} />
             ),
@@ -117,6 +117,45 @@ export default function Layout() {
             },
             drawerLabelStyle: {
               color: "#888", // 👈 xám đậm
+              fontSize: 14,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="scene3"
+          options={{
+            drawerLabel: "PII logged in plain text",
+            title:
+              "Personal Identifiable Information (PII) logged in plain text",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="newspaper" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+            drawerLabelStyle: {
+              color: "#888",
+              fontSize: 14,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="scene4"
+          options={{
+            drawerLabel: "World-readable exportable file",
+            title: "World-readable exportable file",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="folder" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+            drawerLabelStyle: {
+              color: "#888",
               fontSize: 14,
             },
           }}

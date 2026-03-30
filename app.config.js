@@ -41,6 +41,7 @@ export default {
           },
         },
       ],
+      "expo-secure-store",
     ],
     experiments: {
       typedRoutes: true,
