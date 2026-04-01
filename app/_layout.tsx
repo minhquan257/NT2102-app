@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-  DrawerContentComponentProps,
-  DrawerContentScrollView,
-  DrawerItem,
-  DrawerItemList,
+    DrawerContentComponentProps,
+    DrawerContentScrollView,
+    DrawerItem,
+    DrawerItemList,
 } from "@react-navigation/drawer";
 import { usePathname, useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
@@ -110,6 +110,24 @@ export default function Layout() {
             title: "News",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="newspaper" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888", // 👈 xám đậm
+              fontWeight: "600",
+            },
+            drawerLabelStyle: {
+              color: "#888", // 👈 xám đậm
+              fontSize: 14,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="flag-secure"
+          options={{
+            drawerLabel: "FLAG_SECURE Demo",
+            title: "FLAG_SECURE Security Demo",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="shield-checkmark" size={size} color={color} />
             ),
             headerTitleStyle: {
               color: "#888", // 👈 xám đậm
