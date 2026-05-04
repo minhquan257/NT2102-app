@@ -161,6 +161,44 @@ export default function Layout() {
           }}
         />
         <Drawer.Screen
+          name="sqlInjection"
+          options={{
+            drawerLabel: "SQL Injection",
+            title: "SQL Injection Demo",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="newspaper" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+            drawerLabelStyle: {
+              color: "#888",
+              fontSize: 14,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="insecureCommunication"
+          options={{
+            drawerLabel: "Insecure Communication",
+            title: "Insecure Communication Demo",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="lock-open" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+            drawerLabelStyle: {
+              color: "#888",
+              fontSize: 14,
+            },
+          }}
+        />
+        <Drawer.Screen
           name="[id]"
           options={{
             drawerItemStyle: {

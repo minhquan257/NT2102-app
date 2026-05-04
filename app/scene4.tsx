@@ -1,9 +1,19 @@
 import * as Clipboard from "expo-clipboard";
 import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
-import * as Sharing from 'expo-sharing';
+import * as Sharing from "expo-sharing";
 import { useState } from "react";
-import { Alert, Button, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Button,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function FileLeakDemoV2() {
   const [isSecureMode, setIsSecureMode] = useState(false);
@@ -12,15 +22,13 @@ export default function FileLeakDemoV2() {
   const [showCode, setShowCode] = useState(false);
 
   // tạo object file
-  const file = new File(Paths.cache, "token.txt");
+  const file = new File(Paths.document, "token.txt");
   const saveToFile = async () => {
     try {
       file.create(); // tạo file
-      if (isSecureMode)
-        await saveSecure()
-      else
-        file.write(token); // ghi plaintext
-        Alert.alert("Saved", "Token saved to file");
+      if (isSecureMode) await saveSecure();
+      else file.write(token); // ghi plaintext
+      Alert.alert("Saved", "Token saved to file");
     } catch (e) {
       Alert.alert("Error", "File already existed!");
     }
@@ -32,10 +40,7 @@ export default function FileLeakDemoV2() {
       if (isSecureMode) {
         const content = file.textSync();
         setFileContent(content);
-      }
-      else
-        await readSecure()
-      
+      } else await readSecure();
     } catch (e) {
       Alert.alert("Error", "Cannot read file");
     }
@@ -44,12 +49,12 @@ export default function FileLeakDemoV2() {
   const openFile = async () => {
     try {
       if (!(await Sharing.isAvailableAsync())) {
-        alert('Sharing not available on this device');
+        alert("Sharing not available on this device");
         return;
       }
       await Sharing.shareAsync(file.uri);
     } catch (e) {
-      alert('Cannot open file');
+      alert("Cannot open file");
     }
   };
 
@@ -76,8 +81,8 @@ export default function FileLeakDemoV2() {
   };
 
   const handleCopyStringToClipboard = async (str: string) => {
-      await Clipboard.setStringAsync(str);
-    };
+    await Clipboard.setStringAsync(str);
+  };
 
   return (
     <ScrollView style={{ padding: 20 }}>
@@ -105,53 +110,55 @@ export default function FileLeakDemoV2() {
           borderRadius: 5,
         }}
       />
-      <Button title="Save to File" onPress={saveToFile}/>
+      <Button title="Save to File" onPress={saveToFile} />
       <Button title="Read File" onPress={readFile} />
       <Button title="Open File" onPress={openFile} />
       <Button title="Delete File" onPress={deleteFile} />
       <Text>File Content: {fileContent}</Text>
-      <Button title={showCode ? "Hide Code" : "Show Code"} onPress={() => setShowCode((prev) => !prev)} />
+      <Button
+        title={showCode ? "Hide Code" : "Show Code"}
+        onPress={() => setShowCode((prev) => !prev)}
+      />
       {showCode && (
-              <View style={styles.codeContainer}>
-                {/* 🔓 Insecure */}
-                <Text style={styles.codeTitle}>🔓 Insecure Logging</Text>
-                <Text style={styles.codeBlock}>
-                  {`const file = new File(Paths.cache, "token.txt");
+        <View style={styles.codeContainer}>
+          {/* 🔓 Insecure */}
+          <Text style={styles.codeTitle}>🔓 Insecure Logging</Text>
+          <Text style={styles.codeBlock}>
+            {`const file = new File(Paths.cache, "token.txt");
 file.write(token);`}
-                </Text>
-      
-                <TouchableOpacity
-                  onPress={() =>
-                    handleCopyStringToClipboard(
-                      `const file = new File(Paths.cache, "token.txt");
+          </Text>
+
+          <TouchableOpacity
+            onPress={() =>
+              handleCopyStringToClipboard(
+                `const file = new File(Paths.cache, "token.txt");
 file.write(token);`,
-                    )
-                  }
-                >
-                  <Text style={styles.copy}>Copy</Text>
-                </TouchableOpacity>
-                {/* 🔐 Secure */}
-                <Text style={styles.codeTitle}>🔐 Secure Logging</Text>
-                <Text style={styles.codeBlock}>
-                  {`const key = await SecureStore.getItemAsync('secret_key');
+              )
+            }
+          >
+            <Text style={styles.copy}>Copy</Text>
+          </TouchableOpacity>
+          {/* 🔐 Secure */}
+          <Text style={styles.codeTitle}>🔐 Secure Logging</Text>
+          <Text style={styles.codeBlock}>
+            {`const key = await SecureStore.getItemAsync('secret_key');
 const encryptedData = encryptAES(token, key);
 file.write(encryptedData);`}
-                </Text>
-      
-                <TouchableOpacity
-                  onPress={() =>
-                    handleCopyStringToClipboard(`const key = await SecureStore.getItemAsync('secret_key');
+          </Text>
+
+          <TouchableOpacity
+            onPress={() =>
+              handleCopyStringToClipboard(`const key = await SecureStore.getItemAsync('secret_key');
 const encryptedData = encryptAES(token, key);
 file.write(encryptedData);`)
-                  }
-                >
-                  <Text style={styles.copy}>Copy</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            }
+          >
+            <Text style={styles.copy}>Copy</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
-  
 }
 
 const styles = StyleSheet.create({
@@ -174,7 +181,7 @@ const styles = StyleSheet.create({
   text: {
     color: "black",
     fontSize: 20,
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   codeButton: {
     marginTop: 15,
