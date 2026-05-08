@@ -1,15 +1,1260 @@
-import { Text, View } from "react-native";
+import Constants from "expo-constants";
+import { useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-export default function News() {
+type HttpMethod = "GET" | "POST";
+
+type RequestSpec = {
+  method: HttpMethod;
+  path: string;
+  body?: Record<string, string>;
+  query?: Record<string, string>;
+};
+
+type RiskItem = {
+  issueCode: string;
+  title: string;
+  owasp2024: string;
+  description: string;
+  insecureSpecs: RequestSpec[];
+  secureSpecs: RequestSpec[];
+};
+
+type FieldDef = {
+  key: string;
+  label: string;
+  secure?: boolean;
+};
+
+type CaseMode = "insecure" | "secure";
+
+type CodeTokenKind =
+  | "plain"
+  | "comment"
+  | "string"
+  | "keyword"
+  | "number"
+  | "function"
+  | "operator";
+
+type CodeToken = {
+  text: string;
+  kind: CodeTokenKind;
+};
+
+const CODE_KEYWORDS = new Set([
+  "async",
+  "await",
+  "const",
+  "let",
+  "var",
+  "return",
+  "if",
+  "else",
+  "throw",
+  "new",
+  "class",
+  "import",
+  "from",
+  "export",
+  "try",
+  "catch",
+  "for",
+  "while",
+  "switch",
+  "case",
+  "break",
+  "continue",
+  "null",
+  "true",
+  "false",
+  "typeof",
+]);
+
+const CODE_TOKEN_REGEX =
+  /(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\b[A-Za-z_]\w*\b|\b\d+(?:\.\d+)?\b|[{}()[\].,;:+\-*/=<>!&|?]+)/g;
+
+function findCommentStart(line: string): number {
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+
+  for (let i = 0; i < line.length - 1; i += 1) {
+    const ch = line[i];
+    const next = line[i + 1];
+    const prev = i > 0 ? line[i - 1] : "";
+
+    if (ch === "'" && !inDouble && !inTemplate && prev !== "\\") {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (ch === '"' && !inSingle && !inTemplate && prev !== "\\") {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
+      inTemplate = !inTemplate;
+      continue;
+    }
+
+    if (!inSingle && !inDouble && !inTemplate && ch === "/" && next === "/") {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function tokenizeCodeChunk(chunk: string): CodeToken[] {
+  const tokens: CodeToken[] = [];
+  const matches = chunk.matchAll(CODE_TOKEN_REGEX);
+  let lastIndex = 0;
+
+  for (const match of matches) {
+    const text = match[0];
+    const index = match.index ?? 0;
+
+    if (index > lastIndex) {
+      tokens.push({
+        text: chunk.slice(lastIndex, index),
+        kind: "plain",
+      });
+    }
+
+    let kind: CodeTokenKind = "plain";
+    if (text.startsWith("\"") || text.startsWith("'") || text.startsWith("`")) {
+      kind = "string";
+    } else if (/^\d/.test(text)) {
+      kind = "number";
+    } else if (/^[A-Za-z_]\w*$/.test(text)) {
+      if (CODE_KEYWORDS.has(text)) {
+        kind = "keyword";
+      } else {
+        const remaining = chunk.slice(index + text.length);
+        kind = /^\s*\(/.test(remaining) ? "function" : "plain";
+      }
+    } else {
+      kind = "operator";
+    }
+
+    tokens.push({ text, kind });
+    lastIndex = index + text.length;
+  }
+
+  if (lastIndex < chunk.length) {
+    tokens.push({
+      text: chunk.slice(lastIndex),
+      kind: "plain",
+    });
+  }
+
+  return tokens;
+}
+
+function tokenizeCodeLine(line: string): CodeToken[] {
+  const commentStart = findCommentStart(line);
+  if (commentStart === -1) {
+    return tokenizeCodeChunk(line);
+  }
+
+  const beforeComment = line.slice(0, commentStart);
+  const comment = line.slice(commentStart);
+  return [
+    ...tokenizeCodeChunk(beforeComment),
+    { text: comment, kind: "comment" },
+  ];
+}
+
+const UPDATE_ROWS = [
+  { from2016: "M4 + M6", to2024: "M3 Insecure Authentication / Authorization", note: "Merged" },
+  { from2016: "M3", to2024: "M5 Insecure Communication", note: "Moved" },
+  { from2016: "M2", to2024: "M9 Insecure Data Storage", note: "Moved" },
+  { from2016: "M5", to2024: "M10 Insufficient Cryptography", note: "Moved" },
+  { from2016: "M8 + M9", to2024: "M7 Insufficient Binary Protections", note: "Merged" },
+  { from2016: "M10", to2024: "M8 Security Misconfiguration", note: "Reworded" },
+  { from2016: "New", to2024: "M1 Improper Credential Usage", note: "New" },
+  { from2016: "New", to2024: "M2 Inadequate Supply Chain Security", note: "New" },
+  { from2016: "New", to2024: "M4 Input/Output Validation", note: "New" },
+  { from2016: "New", to2024: "M6 Inadequate Privacy Controls", note: "New" },
+];
+
+const RISKS: RiskItem[] = [
+  {
+    issueCode: "PASSCODE_RATE_LIMIT_OFF",
+    title: "Disable passcode rate limit",
+    owasp2024: "M3",
+    description:
+      "Brute-force is possible when repeated failed attempts are not throttled or locked. Credentials appear in URL (server logs / proxy history).",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m5/login",
+        query: { username: "{{username}}", password: "{{password}}" },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "POST",
+        path: "/m5/safe-login",
+        body: { username: "{{username}}", password: "{{password}}" },
+      },
+    ],
+  },
+  {
+    issueCode: "UNVALIDATED_EXTERNAL_INPUT",
+    title: "Unvalidated external input (SQLi via INSERT)",
+    owasp2024: "M4",
+    description:
+      "Raw string interpolation in SQL INSERT lets an attacker break out of string literals and inject arbitrary SQL.",
+    insecureSpecs: [
+      {
+        method: "POST",
+        path: "/sqli/create",
+        body: {
+          customerName: "{{customerName}}",
+          contactName: "Bob",
+          address: "123 Main St",
+          city: "New York",
+          postalCode: "10001",
+          country: "US",
+          password: "{{password}}",
+          username: "{{username}}",
+        },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "POST",
+        path: "/sqli/safe/create",
+        body: {
+          customerName: "Safe User",
+          contactName: "Safe Contact",
+          address: "1 Main Street",
+          city: "HCM",
+          postalCode: "700000",
+          country: "VN",
+          password: "{{password}}",
+          username: "{{username}}",
+          phoneNumber: "0901234567",
+        },
+      },
+    ],
+  },
+  {
+    issueCode: "NET_HTTP_NO_TLS",
+    title: "Token in URL / no HSTS (Insecure Communication)",
+    owasp2024: "M5",
+    description:
+      "Session token passed as URL query param leaks into server logs, CDN logs, browser history, and Referer headers. Response lacks HSTS.",
+    insecureSpecs: [
+      { method: "GET", path: "/m5/sensitive-data" },
+      {
+        method: "GET",
+        path: "/m5/profile",
+        query: { token: "{{token}}" },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "POST",
+        path: "/m5/safe-login",
+        body: { username: "{{username}}", password: "{{password}}" },
+      },
+    ],
+  },
+  {
+    issueCode: "CRYPTO_MD5_NO_SALT",
+    title: "Plaintext / weak password storage",
+    owasp2024: "M10",
+    description:
+      "Insecure endpoint stores the raw password in the DB. Secure endpoint hashes it with bcrypt (12 rounds) before storage.",
+    insecureSpecs: [
+      {
+        method: "POST",
+        path: "/sqli/create",
+        body: {
+          customerName: "CryptoTest",
+          contactName: "CryptoTest",
+          address: "Addr",
+          city: "City",
+          postalCode: "12345",
+          country: "VN",
+          password: "{{password}}",
+          username: "{{username}}_insecure",
+        },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "POST",
+        path: "/sqli/safe/create",
+        body: {
+          customerName: "CryptoTest Safe",
+          contactName: "CryptoTest Safe",
+          address: "Addr",
+          city: "City",
+          postalCode: "12345",
+          country: "VN",
+          password: "{{password}}",
+          username: "{{username}}_secure",
+          phoneNumber: "0909090909",
+        },
+      },
+    ],
+  },
+  {
+    issueCode: "SQLI_UNION_BASED",
+    title: "Union-based SQL injection (data exfiltration)",
+    owasp2024: "M4",
+    description:
+      "Raw id injected into SELECT … WHERE customer_id = <id>. A UNION payload appends an attacker-controlled row, leaking usernames and passwords from the database.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/sqli/union",
+        query: { id: "{{unionPayload}}" },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/sqli/safe/union",
+        query: { id: "{{safeId}}" },
+      },
+    ],
+  },
+  {
+    issueCode: "MISCONF_FLAG_SECURE_OFF",
+    title: "FLAG_SECURE disabled",
+    owasp2024: "M8",
+    description:
+      "Sensitive content can be captured via screenshots/recording when screen protection is off.",
+    insecureSpecs: [],
+    secureSpecs: [],
+  },
+];
+
+const RISK_FIELD_DEFS: Record<string, FieldDef[]> = {
+  PASSCODE_RATE_LIMIT_OFF: [
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", secure: true },
+  ],
+  UNVALIDATED_EXTERNAL_INPUT: [
+    { key: "customerName", label: "Customer Name (try SQL injection)" },
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", secure: true },
+  ],
+  NET_HTTP_NO_TLS: [
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", secure: true },
+    { key: "token", label: "Token (sent in URL - leaks to logs)" },
+  ],
+  CRYPTO_MD5_NO_SALT: [
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password (stored raw vs bcrypt)" },
+  ],
+  SQLI_UNION_BASED: [
+    {
+      key: "unionPayload",
+      label: "id / UNION payload (injected into WHERE clause)",
+    },
+    {
+      key: "safeId",
+      label: "Safe UUID (for secure mode)",
+    },
+  ],
+};
+
+const BACKEND_CODE_SNIPPETS: Record<string, { insecure: string; secure: string }> = {
+  PASSCODE_RATE_LIMIT_OFF: {
+    insecure: `// core-service/src/m5/m5.service.ts
+async loginViaQueryParams(username: string, password: string) {
+  const sql = \
+\
+    SELECT customer_id, username, password
+    FROM customers
+    WHERE username = '\${username}'
+      AND password = '\${password}'
+    LIMIT 1
+  \
+\
+  ;
+  const rows = await this.dataSource.query(sql);
+  return rows[0];
+}`,
+    secure: `// core-service/src/m5/m5.service.ts
+async safeLogin(username: string, password: string) {
+  const user = await this.safeCustomerRepo.findOne({ where: { username } });
+  const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+  if (!passwordMatches) throw new UnauthorizedException('Invalid credentials');
+  return { access_token: this.jwtService.sign({ sub: user.customerId }) };
+}
+
+// core-service/src/m5/m5.controller.ts
+res.setHeader('Strict-Transport-Security',
+  'max-age=63072000; includeSubDomains; preload');`,
+  },
+  UNVALIDATED_EXTERNAL_INPUT: {
+    insecure: `// core-service/src/sqli/sqli.service.ts
+async unsafeCreate(body: Record<string, any>) {
+  const sql = \
+\
+    INSERT INTO customers (...)
+    VALUES ('\${customerName}', '\${contactName}', ..., '\${username}')
+    RETURNING customer_id, customer_name, username
+  \
+\
+  ;
+  return this.dataSource.query(sql);
+}`,
+    secure: `// core-service/src/sqli/sqli.service.ts
+async safeCreate(dto: CreateCustomerDto) {
+  if (!dto.customerName || dto.customerName.length > 255) {
+    throw new BadRequestException('customerName is required and must be ≤255 characters');
+  }
+  const hashedPassword = await bcrypt.hash(dto.password, 10);
+  const customer = this.safeCustomerRepo.create({ ...dto, passwordHash: hashedPassword });
+  return this.safeCustomerRepo.save(customer);
+}`,
+  },
+  NET_HTTP_NO_TLS: {
+    insecure: `// core-service/src/m5/m5.controller.ts
+@Get('sensitive-data')
+async getSensitiveData(@Res() res: Response) {
+  // Deliberately no Strict-Transport-Security header
+  res.setHeader('Content-Type', 'application/json');
+  return res.json(await this.m5Service.getSensitiveData());
+}
+
+// core-service/src/m5/m5.controller.ts
+@Get('profile')
+async getProfileViaTokenInUrl(@Query('token') token: string) {
+  return this.m5Service.getProfileViaTokenInUrl(token);
+}`,
+    secure: `// core-service/src/m5/m5.controller.ts
+@Post('safe-login')
+async safeLogin(...) {
+  const result = await this.m5Service.safeLogin(username, password);
+  res.setHeader('Strict-Transport-Security',
+    'max-age=63072000; includeSubDomains; preload');
+  return res.json(result);
+}`,
+  },
+  CRYPTO_MD5_NO_SALT: {
+    insecure: `// core-service/src/sqli/sqli.service.ts
+async unsafeCreate(body: Record<string, any>) {
+  const sql = \
+\
+    INSERT INTO customers (..., password, username)
+    VALUES (..., '\${password}', '\${username}')
+  \
+\
+  ;
+  return this.dataSource.query(sql); // plaintext password stored
+}`,
+    secure: `// core-service/src/sqli/sqli.service.ts
+async safeCreate(dto: CreateCustomerDto) {
+  const hashedPassword = await bcrypt.hash(dto.password, 10);
+  const customer = this.safeCustomerRepo.create({
+    ...dto,
+    passwordHash: hashedPassword,
+  });
+  return this.safeCustomerRepo.save(customer);
+}`,
+  },
+  SQLI_UNION_BASED: {
+    insecure: `// core-service/src/sqli/sqli.service.ts
+async unionBased(id: string): Promise<any[]> {
+  const sql = \
+\
+    SELECT *
+    FROM customers
+    WHERE customer_id = \${id}
+  \
+\
+  ;
+  return this.dataSource.query(sql);
+}`,
+    secure: `// core-service/src/sqli/sqli.service.ts
+async safeUnionBased(id: string) {
+  if (!UUID_REGEX.test(id)) {
+    throw new BadRequestException('id must be a valid UUID v4');
+  }
+  return this.safeCustomerRepo.findOne({ where: { customerId: id } });
+}`,
+  },
+  MISCONF_FLAG_SECURE_OFF: {
+    insecure: `// No backend endpoint for this risk.
+// This is validated on-device in app/flag-secure.tsx (screen-capture protection off).`,
+    secure: `// No backend endpoint for this risk.
+// This is validated on-device in app/flag-secure.tsx (FLAG_SECURE enabled).`,
+  },
+};
+
+function resolveSpec(spec: RequestSpec, values: Record<string, string>): RequestSpec {
+  const replaceVars = (obj?: Record<string, string>) =>
+    obj
+      ? Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [
+            k,
+            v.replace(/\{\{(\w+)\}\}/g, (_, key: string) => values[key] ?? ""),
+          ]),
+        )
+      : obj;
+
+  return {
+    ...spec,
+    body: replaceVars(spec.body),
+    query: replaceVars(spec.query),
+  };
+}
+
+function buildUrl(baseApiUrl: string, path: string, query?: Record<string, string>) {
+  const base = baseApiUrl.replace(/#.*$/, "").replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${normalizedPath}`);
+
+  if (query) {
+    Object.entries(query).forEach(([k, v]) => {
+      url.searchParams.set(k, v);
+    });
+  }
+
+  return url.toString();
+}
+
+function stringifyResult(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+async function callSpec(baseApiUrl: string, spec: RequestSpec) {
+  const url = buildUrl(baseApiUrl, spec.path, spec.query);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: spec.method,
+      headers: { "Content-Type": "application/json" },
+      body: spec.method === "POST" ? JSON.stringify(spec.body || {}) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = await response.text();
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    url,
+    payload,
+  };
+}
+
+export default function OwaspMobileRiskLabScreen() {
+  const router = useRouter();
+
+  const initialApiUrl =
+    (Constants.expoConfig?.extra?.apiUrl as string | undefined) ||
+    process.env.EXPO_PUBLIC_API_URL ||
+    "https://core-service-znxz.onrender.com";
+
+  const [apiUrl, setApiUrl] = useState(initialApiUrl);
+  const [results, setResults] = useState<Record<string, string>>({});
+  const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [showBackendCode, setShowBackendCode] = useState<Record<string, boolean>>({});
+  const [codeModeByRisk, setCodeModeByRisk] = useState<Record<string, CaseMode>>({});
+  const [fieldValues, setFieldValues] = useState<Record<string, Record<string, string>>>(() => {
+    const ts = Date.now().toString().slice(-6);
+    return {
+      PASSCODE_RATE_LIMIT_OFF: { username: "admin", password: "takasecurity" },
+      UNVALIDATED_EXTERNAL_INPUT: {
+        customerName: "' || (SELECT password FROM customers ORDER BY customer_name LIMIT 1) || '",
+        username: `sqli_${ts}`,
+        password: "testpass",
+      },
+      NET_HTTP_NO_TLS: {
+        username: "admin",
+        password: "takasecurity",
+        token: "token_alice_plaintext_abc123",
+      },
+      CRYPTO_MD5_NO_SALT: {
+        username: `cryptotest_${ts}`,
+        password: "plaintextpass",
+      },
+      SQLI_UNION_BASED: {
+        unionPayload:
+          "0 UNION SELECT 1,username,password,NULL,NULL,NULL,NULL,NULL,NULL FROM customers--",
+        safeId: "123e4567-e89b-4d3c-a456-426614174000",
+      },
+    };
+  });
+
+  const activeApiUrl = useMemo(
+    () => apiUrl.trim() || process.env.EXPO_PUBLIC_API_URL || "https://core-service-znxz.onrender.com",
+    [apiUrl],
+  );
+
+  const runScenario = async (risk: RiskItem, mode: "insecure" | "secure") => {
+    if (risk.issueCode === "MISCONF_FLAG_SECURE_OFF") {
+      router.push("/flag-secure");
+      return;
+    }
+
+    const specs = mode === "insecure" ? risk.insecureSpecs : risk.secureSpecs;
+    if (!specs.length) {
+      setResults((prev) => ({
+        ...prev,
+        [risk.issueCode]: "No API scenario configured for this item.",
+      }));
+      return;
+    }
+
+    setRunningKey(`${risk.issueCode}:${mode}`);
+    setResults((prev) => ({
+      ...prev,
+      [risk.issueCode]: "Connecting... (server may be waking up, please wait up to 60s)",
+    }));
+
+    let lastError = "No endpoint matched.";
+    const userValues = fieldValues[risk.issueCode] ?? {};
+    const runValues = { ...userValues };
+
+    if (
+      (risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
+        risk.issueCode === "CRYPTO_MD5_NO_SALT") &&
+      runValues.username
+    ) {
+      runValues.username = `${runValues.username}_${Date.now().toString().slice(-5)}`;
+    }
+
+    for (const spec of specs) {
+      try {
+        const response = await callSpec(activeApiUrl, resolveSpec(spec, runValues));
+        const resultText = [
+          `[${mode.toUpperCase()}] ${risk.issueCode}`,
+          `Endpoint: ${response.url}`,
+          `Status: ${response.status}`,
+          "Response:",
+          stringifyResult(response.payload),
+        ].join("\n");
+
+        setResults((prev) => ({
+          ...prev,
+          [risk.issueCode]: resultText,
+        }));
+
+        if (response.ok) {
+          setRunningKey(null);
+          return;
+        }
+
+        lastError = `HTTP ${response.status} from ${response.url}`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        lastError = `${spec.path}: ${message}`;
+      }
+    }
+
+    setResults((prev) => ({
+      ...prev,
+      [risk.issueCode]: `Unable to run ${mode} scenario. ${lastError}`,
+    }));
+    setRunningKey(null);
+  };
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>News</Text>
-    </View>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <View style={styles.heroCard}>
+        <Text style={styles.heroTitle}>OWASP Mobile 2024 Risk Lab</Text>
+        <Text style={styles.heroSubtitle}>
+          Based on Security_Issue_Matrix.xlsx + 2016 to 2024 final release updates.
+        </Text>
+
+        <Text style={styles.inputLabel}>Core-service API URL</Text>
+        <TextInput
+          style={styles.input}
+          value={apiUrl}
+          onChangeText={setApiUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder={
+            process.env.EXPO_PUBLIC_API_URL || "https://core-service-znxz.onrender.com"
+          }
+          placeholderTextColor="#789"
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>2016 to 2024 Mapping</Text>
+        {UPDATE_ROWS.map((row, index) => (
+          <View key={`${row.to2024}-${index}`} style={styles.mappingRow}>
+            <Text style={styles.mappingFrom}>{row.from2016}</Text>
+            <Text style={styles.mappingArrow}>{"->"}</Text>
+            <Text style={styles.mappingTo}>{row.to2024}</Text>
+            <Text style={styles.mappingNote}>{row.note}</Text>
+          </View>
+        ))}
+      </View>
+
+      {RISKS.map((risk) => {
+        const isInsecureLoading = runningKey === `${risk.issueCode}:insecure`;
+        const isSecureLoading = runningKey === `${risk.issueCode}:secure`;
+        const backendCode = BACKEND_CODE_SNIPPETS[risk.issueCode];
+        const selectedMode = codeModeByRisk[risk.issueCode] ?? "insecure";
+        const isCodeVisible = !!showBackendCode[risk.issueCode];
+        const codeText = backendCode ? backendCode[selectedMode] : "";
+        const codeLines = codeText.split("\n");
+
+        return (
+          <View key={risk.issueCode} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.issueCode}>{risk.issueCode}</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{risk.owasp2024}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.riskTitle}>{risk.title}</Text>
+            <Text style={styles.riskDescription}>{risk.description}</Text>
+
+            {(RISK_FIELD_DEFS[risk.issueCode] ?? []).map((field) => (
+              <View key={field.key} style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>{field.label}</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={fieldValues[risk.issueCode]?.[field.key] ?? ""}
+                  onChangeText={(val) =>
+                    setFieldValues((prev) => ({
+                      ...prev,
+                      [risk.issueCode]: {
+                        ...prev[risk.issueCode],
+                        [field.key]: val,
+                      },
+                    }))
+                  }
+                  secureTextEntry={field.secure}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholderTextColor="#567"
+                />
+              </View>
+            ))}
+
+            <View style={styles.buttonRow}>
+              <Pressable
+                style={[styles.button, styles.insecureBtn]}
+                onPress={() => runScenario(risk, "insecure")}
+                disabled={isInsecureLoading || isSecureLoading}
+              >
+                {isInsecureLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>Run Insecure</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={[styles.button, styles.secureBtn]}
+                onPress={() => runScenario(risk, "secure")}
+                disabled={isInsecureLoading || isSecureLoading}
+              >
+                {isSecureLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>Run Secure</Text>
+                )}
+              </Pressable>
+            </View>
+
+            <View style={styles.resultBox}>
+              <Text style={styles.resultLabel}>Result</Text>
+              <Text style={styles.resultText}>
+                {results[risk.issueCode] ||
+                  "Tap Run Insecure / Run Secure to call your core-service endpoint."}
+              </Text>
+            </View>
+
+            <Pressable
+              style={styles.backendBtn}
+              onPress={() =>
+                setShowBackendCode((prev) => ({
+                  ...prev,
+                  [risk.issueCode]: !prev[risk.issueCode],
+                }))
+              }
+            >
+              <Text style={styles.buttonText}>
+                {isCodeVisible ? "Hide BE Code" : "Show BE Code"}
+              </Text>
+            </Pressable>
+
+            {isCodeVisible && backendCode && (
+              <View style={styles.codePanel}>
+                <View style={styles.toggleRow}>
+                  <Pressable
+                    style={[
+                      styles.toggleBtn,
+                      selectedMode === "insecure" && styles.toggleBtnActive,
+                    ]}
+                    onPress={() =>
+                      setCodeModeByRisk((prev) => ({
+                        ...prev,
+                        [risk.issueCode]: "insecure",
+                      }))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.toggleBtnText,
+                        selectedMode === "insecure" && styles.toggleBtnTextActive,
+                      ]}
+                    >
+                      Insecure Code
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.toggleBtn,
+                      selectedMode === "secure" && styles.toggleBtnActive,
+                    ]}
+                    onPress={() =>
+                      setCodeModeByRisk((prev) => ({
+                        ...prev,
+                        [risk.issueCode]: "secure",
+                      }))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.toggleBtnText,
+                        selectedMode === "secure" && styles.toggleBtnTextActive,
+                      ]}
+                    >
+                      Secure Code
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.editorHeader}>
+                  <View style={styles.editorDots}>
+                    <View style={[styles.editorDot, styles.editorDotRed]} />
+                    <View style={[styles.editorDot, styles.editorDotYellow]} />
+                    <View style={[styles.editorDot, styles.editorDotGreen]} />
+                  </View>
+                  <Text style={styles.editorTitle}>
+                    {risk.issueCode.toLowerCase()}.{selectedMode}.ts
+                  </Text>
+                </View>
+
+                <ScrollView style={styles.codeScroll} nestedScrollEnabled>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.editorRow}>
+                      <View style={styles.gutterCol}>
+                        {codeLines.map((_, idx) => (
+                          <Text key={`ln-${risk.issueCode}-${idx}`} style={styles.gutterText}>
+                            {idx + 1}
+                          </Text>
+                        ))}
+                      </View>
+
+                      <View style={styles.codeCol}>
+                        {codeLines.map((line, idx) => {
+                          const lineTokens = tokenizeCodeLine(line || " ");
+                          return (
+                            <Text key={`code-${risk.issueCode}-${idx}`} style={styles.codeText}>
+                              {lineTokens.map((token, tokenIdx) => (
+                                <Text
+                                  key={`token-${risk.issueCode}-${idx}-${tokenIdx}`}
+                                  style={[
+                                    styles.codeText,
+                                    token.kind === "comment" && styles.codeComment,
+                                    token.kind === "string" && styles.codeString,
+                                    token.kind === "keyword" && styles.codeKeyword,
+                                    token.kind === "number" && styles.codeNumber,
+                                    token.kind === "function" && styles.codeFunction,
+                                    token.kind === "operator" && styles.codeOperator,
+                                  ]}
+                                >
+                                  {token.text}
+                                </Text>
+                              ))}
+                            </Text>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </ScrollView>
+                </ScrollView>
+              </View>
+            )}
+
+            {risk.issueCode === "PASSCODE_RATE_LIMIT_OFF" && (
+              <>
+                <Text style={styles.hintText}>
+                  The API buttons above test the server-side rate limit. To see the on-device PIN brute-force demo, tap below.
+                </Text>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/scene1")}
+                >
+                  <Text style={styles.buttonText}>Demo on-device rate limit</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "MISCONF_FLAG_SECURE_OFF" && (
+              <Text style={styles.hintText}>
+                This item opens FLAG_SECURE demo because the risk is validated on-device UI behavior.
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#0b1726",
+  },
+  content: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 40,
+  },
+  heroCard: {
+    backgroundColor: "#12263f",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#255789",
+  },
+  heroTitle: {
+    color: "#d9f0ff",
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    color: "#98bbd6",
+    fontSize: 13,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  inputLabel: {
+    color: "#9ecdf5",
+    fontWeight: "700",
+    marginBottom: 6,
+    fontSize: 12,
+  },
+  input: {
+    backgroundColor: "#091424",
+    borderColor: "#2e5b87",
+    borderWidth: 1,
+    borderRadius: 12,
+    color: "#ecf6ff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: "#101f32",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#263f5c",
+  },
+  cardTitle: {
+    color: "#bde2ff",
+    fontWeight: "800",
+    fontSize: 17,
+    marginBottom: 10,
+  },
+  mappingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+    flexWrap: "wrap",
+  },
+  mappingFrom: {
+    color: "#f6c177",
+    fontWeight: "700",
+    minWidth: 55,
+  },
+  mappingArrow: {
+    color: "#96a9bd",
+    fontWeight: "700",
+  },
+  mappingTo: {
+    color: "#dce8f5",
+    flexShrink: 1,
+    maxWidth: "68%",
+  },
+  mappingNote: {
+    color: "#61d78b",
+    fontWeight: "700",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  issueCode: {
+    color: "#8ec7ff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  badge: {
+    borderRadius: 999,
+    backgroundColor: "#1a3553",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "#4f7fb1",
+  },
+  badgeText: {
+    color: "#d9f0ff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  riskTitle: {
+    color: "#e3f3ff",
+    fontWeight: "800",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  riskDescription: {
+    color: "#a8c0d6",
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  fieldRow: {
+    marginBottom: 8,
+  },
+  fieldLabel: {
+    color: "#7fb5e8",
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  fieldInput: {
+    backgroundColor: "#07111d",
+    borderColor: "#2e4661",
+    borderWidth: 1,
+    borderRadius: 8,
+    color: "#d6e6f5",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: "Courier",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  button: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  insecureBtn: {
+    backgroundColor: "#b83d4b",
+  },
+  secureBtn: {
+    backgroundColor: "#1f7a58",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "800",
+  },
+  resultBox: {
+    backgroundColor: "#07111d",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2e4661",
+    padding: 10,
+  },
+  resultLabel: {
+    color: "#7fb5e8",
+    fontWeight: "700",
+    marginBottom: 6,
+    fontSize: 12,
+  },
+  resultText: {
+    color: "#d6e6f5",
+    fontFamily: "Courier",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  hintText: {
+    marginTop: 8,
+    color: "#9ac7ea",
+    fontSize: 12,
+  },
+  demoBtn: {
+    marginTop: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#2a527a",
+  },
+  backendBtn: {
+    marginTop: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#3e4f92",
+  },
+  codePanel: {
+    marginTop: 10,
+    backgroundColor: "#0b1322",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#324864",
+    overflow: "hidden",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 8,
+    margin: 10,
+  },
+  toggleBtn: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2f4d6a",
+    backgroundColor: "#101b2c",
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  toggleBtnActive: {
+    backgroundColor: "#225a86",
+    borderColor: "#74b8ed",
+  },
+  toggleBtnText: {
+    color: "#9cb7cf",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  toggleBtnTextActive: {
+    color: "#e8f6ff",
+  },
+  codeScroll: {
+    maxHeight: 260,
+    borderTopWidth: 1,
+    borderTopColor: "#2e425d",
+  },
+  editorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111d31",
+    borderTopWidth: 1,
+    borderTopColor: "#2e425d",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2e425d",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  editorDots: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  editorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  editorDotRed: {
+    backgroundColor: "#ff5f56",
+  },
+  editorDotYellow: {
+    backgroundColor: "#ffbd2e",
+  },
+  editorDotGreen: {
+    backgroundColor: "#27c93f",
+  },
+  editorTitle: {
+    color: "#9fb7d0",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  editorRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    minWidth: "100%",
+  },
+  gutterCol: {
+    backgroundColor: "#101a2d",
+    borderRightWidth: 1,
+    borderRightColor: "#2e425d",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    minWidth: 42,
+    alignItems: "flex-end",
+  },
+  gutterText: {
+    color: "#5f7894",
+    fontSize: 11,
+    lineHeight: 18,
+    fontFamily: "Courier",
+  },
+  codeCol: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: "#0a1426",
+  },
+  codeText: {
+    color: "#cde5ff",
+    fontFamily: "Courier",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  codeComment: {
+    color: "#6aa56a",
+  },
+  codeString: {
+    color: "#e5c07b",
+  },
+  codeKeyword: {
+    color: "#5ea2ff",
+  },
+  codeNumber: {
+    color: "#d19a66",
+  },
+  codeFunction: {
+    color: "#56b6c2",
+  },
+  codeOperator: {
+    color: "#b8c7da",
+  },
+});

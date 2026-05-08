@@ -13,6 +13,130 @@ import {
     View,
 } from "react-native";
 
+  type CodeTokenKind =
+    | "plain"
+    | "comment"
+    | "string"
+    | "keyword"
+    | "number"
+    | "function"
+    | "operator";
+
+  type CodeToken = {
+    text: string;
+    kind: CodeTokenKind;
+  };
+
+  const CODE_KEYWORDS = new Set([
+    "import",
+    "class",
+    "public",
+    "private",
+    "func",
+    "const",
+    "let",
+    "var",
+    "async",
+    "await",
+    "return",
+    "if",
+    "else",
+    "for",
+    "while",
+    "try",
+    "catch",
+    "true",
+    "false",
+    "null",
+    "new",
+  ]);
+
+  const CODE_TOKEN_REGEX =
+    /(\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\b[A-Za-z_]\w*\b|\b\d+(?:\.\d+)?\b|[{}()[\].,;:+\-*/=<>!&|?]+)/g;
+
+  function findCommentStart(line: string): number {
+    let inSingle = false;
+    let inDouble = false;
+    let inTemplate = false;
+
+    for (let i = 0; i < line.length - 1; i += 1) {
+      const ch = line[i];
+      const next = line[i + 1];
+      const prev = i > 0 ? line[i - 1] : "";
+
+      if (ch === "'" && !inDouble && !inTemplate && prev !== "\\") {
+        inSingle = !inSingle;
+        continue;
+      }
+      if (ch === '"' && !inSingle && !inTemplate && prev !== "\\") {
+        inDouble = !inDouble;
+        continue;
+      }
+      if (ch === "`" && !inSingle && !inDouble && prev !== "\\") {
+        inTemplate = !inTemplate;
+        continue;
+      }
+
+      if (!inSingle && !inDouble && !inTemplate && ch === "/" && next === "/") {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  function tokenizeCodeChunk(chunk: string): CodeToken[] {
+    const tokens: CodeToken[] = [];
+    const matches = chunk.matchAll(CODE_TOKEN_REGEX);
+    let lastIndex = 0;
+
+    for (const match of matches) {
+      const text = match[0];
+      const index = match.index ?? 0;
+
+      if (index > lastIndex) {
+        tokens.push({ text: chunk.slice(lastIndex, index), kind: "plain" });
+      }
+
+      let kind: CodeTokenKind = "plain";
+      if (text.startsWith("\"") || text.startsWith("'") || text.startsWith("`")) {
+        kind = "string";
+      } else if (/^\d/.test(text)) {
+        kind = "number";
+      } else if (/^[A-Za-z_]\w*$/.test(text)) {
+        if (CODE_KEYWORDS.has(text)) {
+          kind = "keyword";
+        } else {
+          const remaining = chunk.slice(index + text.length);
+          kind = /^\s*\(/.test(remaining) ? "function" : "plain";
+        }
+      } else {
+        kind = "operator";
+      }
+
+      tokens.push({ text, kind });
+      lastIndex = index + text.length;
+    }
+
+    if (lastIndex < chunk.length) {
+      tokens.push({ text: chunk.slice(lastIndex), kind: "plain" });
+    }
+
+    return tokens;
+  }
+
+  function tokenizeCodeLine(line: string): CodeToken[] {
+    const commentStart = findCommentStart(line);
+    if (commentStart === -1) {
+      return tokenizeCodeChunk(line);
+    }
+
+    return [
+      ...tokenizeCodeChunk(line.slice(0, commentStart)),
+      { text: line.slice(commentStart), kind: "comment" },
+    ];
+  }
+
 const ANDROID_SECURE_CODE = `// Android - Secure Implementation (FLAG_SECURE enabled)
 // File: MainActivity.java
 
@@ -270,13 +394,13 @@ export default function FlagSecureScreen() {
     if (value) {
       Alert.alert(
         "🔒 Secure Mode Enabled",
-        "FLAG_SECURE is now enabled.\n\n📱 On real devices:\n• Screenshots will be blocked\n• Screen recording will show black screen\n• App switcher will hide content\n\n⚠️ Note: Protection doesn't work in Expo Go or iOS Simulator. Requires development build with native code.",
+        "FLAG_SECURE is enabled.\n\nOn real devices, screenshots and recordings are blocked. In simulator/Expo Go this is only a visual demo.",
         [{ text: "Understood" }]
       );
     } else {
       Alert.alert(
         "⚠️ Insecure Mode Enabled", 
-        "FLAG_SECURE is disabled. This screen can now be screenshot or recorded.\n\n🚨 Security Risk:\n• OTP codes can be captured\n• Personal data exposed\n• Financial info vulnerable\n\n📱 In this simulator, you can see the content captured. On real devices, this data would be equally exposed to malware or social engineering attacks.",
+        "FLAG_SECURE is disabled. Sensitive content can now be captured by screenshot and screen recording.",
         [
           { text: "I Understand the Risk", style: "destructive" }
         ]
@@ -292,6 +416,16 @@ export default function FlagSecureScreen() {
     } else {
       return REACT_NATIVE_IMPLEMENTATION;
     }
+  };
+
+  const getCodeFileName = () => {
+    if (selectedCodeTab === "android") {
+      return codeType === "secure" ? "MainActivity.secure.java" : "MainActivity.insecure.java";
+    }
+    if (selectedCodeTab === "ios") {
+      return codeType === "secure" ? "AppDelegate.secure.swift" : "AppDelegate.insecure.swift";
+    }
+    return "SecureScreen.rn.tsx";
   };
 
   const getRiskLevel = () => {
@@ -358,14 +492,8 @@ export default function FlagSecureScreen() {
         </View>
 
         <Text style={styles.controlDescription}>
-          Toggle to see the difference between secure and insecure implementations.
-          {"\n\n"}When SECURE mode is enabled:
-          {"\n"}✓ Simulator screenshots still work (limitation)
-          {"\n"}✓ Minimize app → overlay appears (background protection)
-          {"\n"}✓ Check recent apps → content hidden
-          {"\n\n"}On real devices with native implementation:
-          {"\n"}✓ Screenshots blocked entirely
-          {"\n"}✓ Screen recording shows black screen
+          Toggle mode and compare behavior. Secure mode demonstrates protection,
+          insecure mode demonstrates leakage risk.
         </Text>
       </View>
 
@@ -412,38 +540,6 @@ export default function FlagSecureScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Sensitive Content Simulation */}
-      <View style={styles.sensitiveCard}>
-        <Text style={styles.cardTitle}>
-          <Ionicons name="eye-off" size={16} /> Sensitive Content
-        </Text>
-        
-        <View style={styles.sensitiveContent}>
-          <Text style={styles.sensitiveLabel}>OTP Verification</Text>
-          <View style={styles.otpContainer}>
-            <Text style={styles.otpCode}>123456</Text>
-          </View>
-          
-          <Text style={styles.sensitiveLabel}>User Credentials</Text>
-          <Text style={styles.credentialText}>Email: user@example.com</Text>
-          <Text style={styles.credentialText}>Password: ••••••••</Text>
-          
-          <Text style={styles.sensitiveLabel}>Payment Information</Text>
-          <Text style={styles.credentialText}>Card: •••• •••• •••• 1234</Text>
-          <Text style={styles.credentialText}>CVV: •••</Text>
-        </View>
-        
-        <View style={styles.warningContainer}>
-          <Ionicons name={isSecureMode ? "shield-checkmark" : "warning"} size={16} color={isSecureMode ? "#4CAF50" : "#FF6B6B"} />
-          <Text style={styles.warningText}>
-            {isSecureMode 
-              ? "✅ This content would be protected from screenshots on real devices"
-              : "⚠️ This sensitive content would be captured in screenshots!"
-            }
-          </Text>
-        </View>
-      </View>
-
       {/* Code Examples */}
       <View style={styles.codeCard}>
         <View style={styles.codeHeader}>
@@ -455,7 +551,7 @@ export default function FlagSecureScreen() {
             <Ionicons 
               name={showCode ? "code-slash" : "code"} 
               size={16} 
-              color="#007AFF" 
+              color="#9ecdf5" 
             />
             <Text style={styles.showCodeText}>
               {showCode ? "Hide Code" : "Show Code"}
@@ -519,9 +615,56 @@ export default function FlagSecureScreen() {
 
             {/* Code Display */}
             <View style={styles.codeWrapper}>
+              <View style={styles.editorHeader}>
+                <View style={styles.editorDots}>
+                  <View style={[styles.editorDot, styles.editorDotRed]} />
+                  <View style={[styles.editorDot, styles.editorDotYellow]} />
+                  <View style={[styles.editorDot, styles.editorDotGreen]} />
+                </View>
+                <Text style={styles.editorTitle}>{getCodeFileName()}</Text>
+              </View>
+
               <ScrollView style={styles.codeContainer} nestedScrollEnabled>
-                <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled>
-                  <Text style={styles.codeText}>{getDisplayCode()}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled>
+                  <View style={styles.editorRow}>
+                    <View style={styles.gutterCol}>
+                      {getDisplayCode()
+                        .split("\n")
+                        .map((_, idx) => (
+                          <Text key={`ln-${idx}`} style={styles.gutterText}>
+                            {idx + 1}
+                          </Text>
+                        ))}
+                    </View>
+
+                    <View style={styles.codeCol}>
+                      {getDisplayCode()
+                        .split("\n")
+                        .map((line, idx) => {
+                          const tokens = tokenizeCodeLine(line || " ");
+                          return (
+                            <Text key={`line-${idx}`} style={styles.codeText}>
+                              {tokens.map((token, tokenIdx) => (
+                                <Text
+                                  key={`token-${idx}-${tokenIdx}`}
+                                  style={[
+                                    styles.codeText,
+                                    token.kind === "comment" && styles.codeComment,
+                                    token.kind === "string" && styles.codeString,
+                                    token.kind === "keyword" && styles.codeKeyword,
+                                    token.kind === "number" && styles.codeNumber,
+                                    token.kind === "function" && styles.codeFunction,
+                                    token.kind === "operator" && styles.codeOperator,
+                                  ]}
+                                >
+                                  {token.text}
+                                </Text>
+                              ))}
+                            </Text>
+                          );
+                        })}
+                    </View>
+                  </View>
                 </ScrollView>
               </ScrollView>
             </View>
@@ -529,69 +672,9 @@ export default function FlagSecureScreen() {
         )}
       </View>
 
-      {/* Implementation Notes */}
-      <View style={styles.notesCard}>
-        <Text style={styles.cardTitle}>
-          <Ionicons name="information-circle" size={16} /> Implementation Notes
-        </Text>
-        
-        <View style={styles.noteSection}>
-          <Text style={styles.noteTitle}>📱 How to test the protection:</Text>
-          <Text style={styles.noteText}>
-            1. Enable "FLAG_SECURE" toggle above{"\n"}
-            2. Try taking screenshot now (using Cmd+S){"\n"}
-            → Screenshot works (simulator limitation){"\n"}
-            3. Press Home button to minimize app{"\n"}
-            → Overlay appears! This is iOS protection{"\n"}
-            4. Check recent apps - content is hidden!
-          </Text>
-        </View>
-        
-        <View style={styles.noteSection}>
-          <Text style={styles.noteTitle}>🔧 To enable real protection:</Text>
-          <Text style={styles.noteText}>
-            1. Run: expo install expo-screen-capture{"\n"}
-            2. Use: preventScreenCaptureAsync(){"\n"}
-            3. Create development build{"\n"}
-            4. Test on physical device
-          </Text>
-        </View>
-        
-        <View style={styles.noteSection}>
-          <Text style={styles.noteTitle}>⚠️ Platform differences:</Text>
-          <Text style={styles.noteText}>
-            • Android: Native FLAG_SECURE support{"\n"}
-            • iOS: Background protection + detection{"\n"}
-            • React Native: expo-screen-capture wrapper{"\n"}
-            • Web: Limited browser-dependent protection
-          </Text>
-        </View>
-      </View>
-
-      {/* OWASP Information */}
-      <View style={styles.owaspCard}>
-        <Text style={styles.cardTitle}>
-          <Ionicons name="information-circle" size={16} /> OWASP Information
-        </Text>
-        
-        <View style={styles.owaspInfo}>
-          <Text style={styles.owaspLabel}>Category:</Text>
-          <Text style={styles.owaspValue}>OWASP 2024 M8 - Security Misconfiguration</Text>
-          
-          <Text style={styles.owaspLabel}>Threat:</Text>
-          <Text style={styles.owaspValue}>Sensitive data exposure through screenshots</Text>
-          
-          <Text style={styles.owaspLabel}>Impact:</Text>
-          <Text style={styles.owaspValue}>Medium - Unauthorized access to sensitive information</Text>
-          
-          <Text style={styles.owaspLabel}>Mitigation:</Text>
-          <Text style={styles.owaspValue}>Enable FLAG_SECURE for sensitive content</Text>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          🔒 Always enable FLAG_SECURE for screens containing sensitive information
+      <View style={styles.footerCompact}>
+        <Text style={styles.footerCompactText}>
+          OWASP M8: Secure configuration helps prevent screenshot data leaks.
         </Text>
       </View>
       </ScrollView>
@@ -627,35 +710,35 @@ export default function FlagSecureScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#0b1726",
   },
   header: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#12263f",
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "#255789",
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#333",
+    color: "#d9f0ff",
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
+    color: "#98bbd6",
   },
   statusCard: {
     margin: 16,
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#101f32",
     borderRadius: 12,
     borderWidth: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   statusHeader: {
     flexDirection: "row",
@@ -669,7 +752,7 @@ const styles = StyleSheet.create({
   },
   statusDescription: {
     fontSize: 14,
-    color: "#666",
+    color: "#a8c0d6",
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -680,7 +763,7 @@ const styles = StyleSheet.create({
   riskLabel: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
+    color: "#bde2ff",
   },
   riskLevel: {
     fontSize: 14,
@@ -690,18 +773,15 @@ const styles = StyleSheet.create({
     margin: 16,
     marginTop: 0,
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#101f32",
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#263f5c",
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "#e3f3ff",
     marginBottom: 12,
   },
   switchContainer: {
@@ -715,12 +795,12 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
-    color: "#333",
+    color: "#d6e6f5",
     fontWeight: "500",
   },
   controlDescription: {
     fontSize: 12,
-    color: "#666",
+    color: "#9ac7ea",
     fontStyle: "italic",
     lineHeight: 16,
   },
@@ -728,18 +808,15 @@ const styles = StyleSheet.create({
     margin: 16,
     marginTop: 0,
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#101f32",
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#263f5c",
   },
   simulationLabel: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#333",
+    color: "#bde2ff",
     marginBottom: 12,
   },
   secureScreenshot: {
@@ -752,12 +829,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   vulnerableScreenshot: {
-    backgroundColor: "#ffe6e6",
+    backgroundColor: "#391d2a",
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: "#ff4444",
+    borderColor: "#b83d4b",
   },
   screenshotText: {
     color: "#4CAF50",
@@ -778,7 +855,7 @@ const styles = StyleSheet.create({
   },
   exposedText: {
     fontSize: 14,
-    color: "#333",
+    color: "#ffd4da",
     marginBottom: 4,
     fontFamily: "monospace",
   },
@@ -792,7 +869,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#007AFF",
+    backgroundColor: "#2a527a",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -803,100 +880,13 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginLeft: 8,
   },
-  notesCard: {
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#2196F3",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  noteSection: {
-    marginBottom: 12,
-  },
-  noteTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  noteText: {
-    fontSize: 13,
-    color: "#666",
-    lineHeight: 18,
-  },
-  sensitiveCard: {
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sensitiveContent: {
-    marginBottom: 12,
-  },
-  sensitiveLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  otpContainer: {
-    backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  otpCode: {
-    fontSize: 24,
-    fontWeight: "bold",
-    letterSpacing: 8,
-    color: "#007AFF",
-  },
-  credentialText: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 4,
-    fontFamily: "monospace",
-  },
-  warningContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: "#fff3cd",
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#ffc107",
-  },
-  warningText: {
-    fontSize: 12,
-    color: "#856404",
-    marginLeft: 8,
-    flex: 1,
-  },
   codeCard: {
     margin: 16,
     marginTop: 0,
-    backgroundColor: "#fff",
+    backgroundColor: "#101f32",
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#263f5c",
   },
   codeHeader: {
     flexDirection: "row",
@@ -904,18 +894,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#2e4661",
   },
   showCodeButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#1a3553",
     borderRadius: 6,
   },
   showCodeText: {
-    color: "#007AFF",
+    color: "#9ecdf5",
     marginLeft: 6,
     fontSize: 14,
     fontWeight: "500",
@@ -929,18 +919,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#07111d",
     borderRadius: 6,
     marginHorizontal: 2,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2e4661",
   },
   activeTab: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#225a86",
+    borderColor: "#74b8ed",
   },
   tabText: {
     fontSize: 12,
     fontWeight: "500",
-    color: "#666",
+    color: "#a8c0d6",
   },
   activeTabText: {
     color: "#fff",
@@ -957,9 +950,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     marginRight: 8,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#07111d",
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    borderColor: "#2e4661",
   },
   secureButton: {
     backgroundColor: "#4CAF50",
@@ -973,7 +966,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     marginLeft: 4,
-    color: "#666",
+    color: "#a8c0d6",
   },
   secureButtonText: {
     color: "#fff",
@@ -986,66 +979,109 @@ const styles = StyleSheet.create({
     marginTop: 0,
     borderRadius: 8,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#2e4661",
+  },
+  editorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111d31",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2e425d",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  editorDots: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  editorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  editorDotRed: {
+    backgroundColor: "#ff5f56",
+  },
+  editorDotYellow: {
+    backgroundColor: "#ffbd2e",
+  },
+  editorDotGreen: {
+    backgroundColor: "#27c93f",
+  },
+  editorTitle: {
+    color: "#9fb7d0",
+    fontSize: 12,
+    fontWeight: "700",
   },
   codeContainer: {
     backgroundColor: "#1e1e1e",
-    padding: 16,
-    minHeight: 300,
-    maxHeight: 400,
+    minHeight: 220,
+    maxHeight: 340,
+  },
+  editorRow: {
+    flexDirection: "row",
+    minWidth: "100%",
+  },
+  gutterCol: {
+    backgroundColor: "#101a2d",
+    borderRightWidth: 1,
+    borderRightColor: "#2e425d",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    minWidth: 42,
+    alignItems: "flex-end",
+  },
+  gutterText: {
+    color: "#5f7894",
+    fontSize: 11,
+    lineHeight: 17,
+    fontFamily: "monospace",
+  },
+  codeCol: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: "#0a1426",
   },
   codeText: {
     fontSize: 11,
     fontFamily: "monospace",
     color: "#d4d4d4",
-    lineHeight: 16,
+    lineHeight: 17,
   },
-  owaspCard: {
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#FF6B35",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  codeComment: {
+    color: "#6aa56a",
   },
-  owaspInfo: {
-    marginTop: 8,
+  codeString: {
+    color: "#e5c07b",
   },
-  owaspLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginTop: 8,
-    marginBottom: 2,
+  codeKeyword: {
+    color: "#5ea2ff",
   },
-  owaspValue: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
+  codeNumber: {
+    color: "#d19a66",
   },
-  footer: {
-    margin: 16,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: "#e8f5e8",
+  codeFunction: {
+    color: "#56b6c2",
+  },
+  codeOperator: {
+    color: "#b8c7da",
+  },
+  footerCompact: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    marginTop: 2,
+    padding: 12,
+    backgroundColor: "#1a3553",
     borderRadius: 8,
-    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2e4661",
   },
-  footerText: {
-    fontSize: 14,
-    color: "#2e7d32",
+  footerCompactText: {
+    fontSize: 12,
+    color: "#cde5ff",
     textAlign: "center",
-    fontWeight: "500",
   },
   backgroundOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1056,10 +1092,11 @@ const styles = StyleSheet.create({
   },
   overlayContent: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(16, 31, 50, 0.95)",
+    borderWidth: 1,
+    borderColor: "#255789",
     borderRadius: 16,
     padding: 32,
-    backdropFilter: "blur(10px)",
   },
   overlayTitle: {
     fontSize: 28,
@@ -1076,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   overlayDescription: {
     fontSize: 14,
-    color: "#ddd",
+    color: "#b7d0e8",
     marginBottom: 12,
   },
   overlayList: {
@@ -1084,12 +1121,12 @@ const styles = StyleSheet.create({
   },
   overlayListItem: {
     fontSize: 13,
-    color: "#ddd",
+    color: "#d6e6f5",
     marginVertical: 4,
   },
   overlayHint: {
     fontSize: 12,
-    color: "#aaa",
+    color: "#98bbd6",
     marginTop: 16,
     fontStyle: "italic",
   },

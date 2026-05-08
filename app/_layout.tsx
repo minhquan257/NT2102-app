@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-    DrawerContentComponentProps,
-    DrawerContentScrollView,
-    DrawerItem,
-    DrawerItemList,
+  DrawerContentComponentProps,
+  DrawerContentScrollView,
+  DrawerItem,
+  DrawerItemList,
 } from "@react-navigation/drawer";
 import { usePathname, useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
@@ -86,28 +86,22 @@ export default function Layout() {
         }}
       >
         <Drawer.Screen
-          name="scene1" // This is the name of the page and must match the url from root
+          name="index"
+          options={{ drawerItemStyle: { display: "none" } }}
+        />
+        <Drawer.Screen
+          name="scene1"
           options={{
             drawerLabel: "Disable passcode rate limit",
             title: "Disable passcode rate limit",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name={"lock-open"} size={size} color={color} />
-            ),
-            headerTitleStyle: {
-              color: "#888", // 👈 xám đậm
-              fontWeight: "600",
-            },
-            drawerLabelStyle: {
-              color: "#888", // 👈 xám đậm
-              fontSize: 14,
-            },
+            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
           name="news"
           options={{
-            drawerLabel: "News",
-            title: "News",
+            drawerLabel: "OWASP Mobile Risk Lab",
+            title: "OWASP Mobile Risk Lab",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="newspaper" size={size} color={color} />
             ),
@@ -126,17 +120,7 @@ export default function Layout() {
           options={{
             drawerLabel: "FLAG_SECURE Demo",
             title: "FLAG_SECURE Security Demo",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="shield-checkmark" size={size} color={color} />
-            ),
-            headerTitleStyle: {
-              color: "#888", // 👈 xám đậm
-              fontWeight: "600",
-            },
-            drawerLabelStyle: {
-              color: "#888", // 👈 xám đậm
-              fontSize: 14,
-            },
+            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
