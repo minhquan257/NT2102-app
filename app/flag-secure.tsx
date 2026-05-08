@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ScreenCapture from "expo-screen-capture";
 import React, { useRef, useState } from "react";
 import {
     Alert,
     AppState,
     AppStateStatus,
+    Platform,
     ScrollView,
     StyleSheet,
     Switch,
@@ -366,9 +368,31 @@ export default function FlagSecureScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
+      const secureTag = "flag-secure-demo";
+
+      const applyCaptureProtection = async () => {
+        try {
+          if (isSecureMode) {
+            await ScreenCapture.preventScreenCaptureAsync(secureTag);
+          } else {
+            await ScreenCapture.allowScreenCaptureAsync(secureTag);
+          }
+        } catch {
+          // Ignore runtime errors in unsupported contexts.
+        }
+      };
+
+      void applyCaptureProtection();
+
       // Hide overlay when screen is focused
       setShowBackgroundOverlay(false);
-    }, [])
+
+      return () => {
+        void ScreenCapture.allowScreenCaptureAsync(secureTag).catch(() => {
+          // Best-effort cleanup when leaving this screen.
+        });
+      };
+    }, [isSecureMode])
   );
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -394,7 +418,9 @@ export default function FlagSecureScreen() {
     if (value) {
       Alert.alert(
         "🔒 Secure Mode Enabled",
-        "FLAG_SECURE is enabled.\n\nOn real devices, screenshots and recordings are blocked. In simulator/Expo Go this is only a visual demo.",
+        Platform.OS === "android"
+          ? "FLAG_SECURE is enabled. On Android real devices, screenshots and recordings should now be blocked."
+          : "Secure mode is enabled. iOS does not fully block hardware-button screenshots, but background/task-switcher leakage is still reduced.",
         [{ text: "Understood" }]
       );
     } else {
@@ -697,6 +723,15 @@ export default function FlagSecureScreen() {
               <Text style={styles.overlayListItem}>• Third-party screenshot apps</Text>
               <Text style={styles.overlayListItem}>• Screen recording services</Text>
             </View>
+            <TouchableOpacity
+              style={styles.overlayCloseButton}
+              onPress={() => setShowBackgroundOverlay(false)}
+            >
+              <View style={styles.overlayCloseButtonContent}>
+                <Ionicons name="close-circle" size={18} color="#fff" />
+                <Text style={styles.overlayCloseButtonText}>Close Demo Popup</Text>
+              </View>
+            </TouchableOpacity>
             <Text style={styles.overlayHint}>
               This demonstrates iOS background protection
             </Text>
@@ -1123,6 +1158,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#d6e6f5",
     marginVertical: 4,
+  },
+  overlayCloseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    backgroundColor: "#2a527a",
+    borderWidth: 1,
+    borderColor: "#74b8ed",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    width: "100%",
+  },
+  overlayCloseButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  overlayCloseButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   overlayHint: {
     fontSize: 12,
