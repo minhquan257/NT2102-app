@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-const BASE_URL = "http://10.0.2.2:3000";
+const BASE_URL = "https://core-service-znxz.onrender.com";
 
 export default function SqlInjectionScreen() {
   const [isSecure, setIsSecure] = useState(false);
