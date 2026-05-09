@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -189,6 +189,60 @@ const UPDATE_ROWS = [
 
 const RISKS: RiskItem[] = [
   {
+    issueCode: "IMPROPER_CREDENTIAL_USAGE",
+    title: "Improper credential usage",
+    owasp2024: "M1",
+    description:
+      "Hardcoded, reused, or long-lived credentials can be extracted and abused. Demo shows hardcoded API keys vs. short-lived tokens.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m1/insecure-api-key",
+      },
+      {
+        method: "GET",
+        path: "/m1/insecure-stored-credentials",
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/m1/safe-api-key",
+      },
+      {
+        method: "GET",
+        path: "/m1/safe-stored-credentials",
+      },
+    ],
+  },
+  {
+    issueCode: "SUPPLY_CHAIN_SECURITY_WEAK",
+    title: "Inadequate supply chain security",
+    owasp2024: "M2",
+    description:
+      "Risk from untrusted dependencies, tampered artifacts, or missing integrity checks in build pipelines.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m2/insecure-dependencies",
+      },
+      {
+        method: "GET",
+        path: "/m2/insecure-build-info",
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/m2/safe-dependencies",
+      },
+      {
+        method: "GET",
+        path: "/m2/safe-build-info",
+      },
+    ],
+  },
+  {
     issueCode: "PASSCODE_RATE_LIMIT_OFF",
     title: "Disable passcode rate limit",
     owasp2024: "M3",
@@ -250,6 +304,27 @@ const RISKS: RiskItem[] = [
     ],
   },
   {
+    issueCode: "SQLI_UNION_BASED",
+    title: "Union-based SQL injection (data exfiltration)",
+    owasp2024: "M4",
+    description:
+      "Raw id injected into SELECT … WHERE customer_id = <id>. A UNION payload appends an attacker-controlled row, leaking usernames and passwords from the database.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/sqli/union",
+        query: { id: "{{unionPayload}}" },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/sqli/safe/union",
+        query: { id: "{{safeId}}" },
+      },
+    ],
+  },
+  {
     issueCode: "NET_HTTP_NO_TLS",
     title: "Token in URL / no HSTS (Insecure Communication)",
     owasp2024: "M5",
@@ -268,6 +343,99 @@ const RISKS: RiskItem[] = [
         method: "POST",
         path: "/m5/safe-login",
         body: { username: "{{username}}", password: "{{password}}" },
+      },
+    ],
+  },
+  {
+    issueCode: "PRIVACY_CONTROLS_WEAK",
+    title: "Inadequate privacy controls",
+    owasp2024: "M6",
+    description:
+      "Insufficient consent/data-minimization/access controls can expose personal data and violate privacy requirements.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m6/insecure-profile",
+        query: { userId: "{{userId}}" },
+      },
+      {
+        method: "GET",
+        path: "/m6/insecure-data-sharing",
+        query: { userId: "{{userId}}" },
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/m6/safe-profile",
+        query: { userId: "{{userId}}" },
+      },
+      {
+        method: "GET",
+        path: "/m6/safe-data-sharing",
+      },
+    ],
+  },
+  {
+    issueCode: "BINARY_PROTECTIONS_WEAK",
+    title: "Insufficient binary protections",
+    owasp2024: "M7",
+    description:
+      "Missing anti-tamper, anti-debug, and hardening controls increases risk of reverse engineering and runtime manipulation.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m7/insecure-hardening",
+      },
+      {
+        method: "GET",
+        path: "/m7/insecure-runtime-info",
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/m7/safe-hardening",
+      },
+      {
+        method: "GET",
+        path: "/m7/safe-runtime-info",
+      },
+    ],
+  },
+  {
+    issueCode: "MISCONF_FLAG_SECURE_OFF",
+    title: "FLAG_SECURE disabled",
+    owasp2024: "M8",
+    description:
+      "Sensitive content can be captured via screenshots/recording when screen protection is off.",
+    insecureSpecs: [],
+    secureSpecs: [],
+  },
+  {
+    issueCode: "INSECURE_DATA_STORAGE",
+    title: "Insecure data storage",
+    owasp2024: "M9",
+    description:
+      "Sensitive data at rest is exposed when stored without strong encryption, key protection, or lifecycle controls.",
+    insecureSpecs: [
+      {
+        method: "GET",
+        path: "/m9/insecure-storage-status",
+      },
+      {
+        method: "GET",
+        path: "/m9/insecure-cache-status",
+      },
+    ],
+    secureSpecs: [
+      {
+        method: "GET",
+        path: "/m9/safe-storage-status",
+      },
+      {
+        method: "GET",
+        path: "/m9/safe-cache-status",
       },
     ],
   },
@@ -311,36 +479,6 @@ const RISKS: RiskItem[] = [
       },
     ],
   },
-  {
-    issueCode: "SQLI_UNION_BASED",
-    title: "Union-based SQL injection (data exfiltration)",
-    owasp2024: "M4",
-    description:
-      "Raw id injected into SELECT … WHERE customer_id = <id>. A UNION payload appends an attacker-controlled row, leaking usernames and passwords from the database.",
-    insecureSpecs: [
-      {
-        method: "GET",
-        path: "/sqli/union",
-        query: { id: "{{unionPayload}}" },
-      },
-    ],
-    secureSpecs: [
-      {
-        method: "GET",
-        path: "/sqli/safe/union",
-        query: { id: "{{safeId}}" },
-      },
-    ],
-  },
-  {
-    issueCode: "MISCONF_FLAG_SECURE_OFF",
-    title: "FLAG_SECURE disabled",
-    owasp2024: "M8",
-    description:
-      "Sensitive content can be captured via screenshots/recording when screen protection is off.",
-    insecureSpecs: [],
-    secureSpecs: [],
-  },
 ];
 
 const RISK_FIELD_DEFS: Record<string, FieldDef[]> = {
@@ -372,6 +510,13 @@ const RISK_FIELD_DEFS: Record<string, FieldDef[]> = {
       label: "Safe UUID (for secure mode)",
     },
   ],
+  IMPROPER_CREDENTIAL_USAGE: [],
+  SUPPLY_CHAIN_SECURITY_WEAK: [],
+  PRIVACY_CONTROLS_WEAK: [
+    { key: "userId", label: "User ID" },
+  ],
+  BINARY_PROTECTIONS_WEAK: [],
+  INSECURE_DATA_STORAGE: [],
 };
 
 const BACKEND_CODE_SNIPPETS: Record<string, { insecure: string; secure: string }> = {
@@ -498,6 +643,142 @@ async safeUnionBased(id: string) {
     secure: `// No backend endpoint for this risk.
 // This is validated on-device in app/flag-secure.tsx (FLAG_SECURE enabled).`,
   },
+  IMPROPER_CREDENTIAL_USAGE: {
+    insecure: `// core-service/src/m1/m1.service.ts
+async insecureGetApiKey() {
+  return {
+    warning: 'Hardcoded and long-lived',
+    api_key: 'sk_live_51234567890_abcdef_HARDCODED',
+    api_key_expires: 'NEVER',
+    bearer_token: 'eyJhbGciOiJIUzI1NiIs...',
+    risks: ['Key visible in logs', 'Never expires'],
+  };
+}`,
+    secure: `// core-service/src/m1/m1.service.ts
+async safeGetApiKey() {
+  const expiresInSeconds = 3600;
+  return {
+    access_token: 'temp_token_' + Date.now() + '_with_expiry',
+    token_type: 'Bearer',
+    expires_in: expiresInSeconds,
+    scopes: ['read:profile', 'write:data'],
+    refresh_token_required: 'yes',
+  };
+}`,
+  },
+  SUPPLY_CHAIN_SECURITY_WEAK: {
+    insecure: `// core-service/src/m2/m2.service.ts
+async insecureCheckDependencies() {
+  return {
+    dependencies: [
+      { name: 'lodash', version: '4.17.15', vulnerabilities: 1, severity: 'HIGH', cve: 'CVE-2019-10744' },
+      { name: 'express', version: '4.16.2', vulnerabilities: 5, severity: 'HIGH' },
+    ],
+    risks: ['Known RCE vulnerabilities', 'No artifact signing'],
+  };
+}`,
+    secure: `// core-service/src/m2/m2.service.ts
+async safeCheckDependencies() {
+  return {
+    dependencies: [
+      { name: 'lodash', version: '4.17.21', vulnerabilities: 0 },
+      { name: 'express', version: '4.18.2', vulnerabilities: 0 },
+    ],
+    security_measures: [
+      'Weekly vulnerability scanning',
+      'Artifacts signed with GPG',
+      'SBOM generated and signed',
+    ],
+  };
+}`,
+  },
+  PRIVACY_CONTROLS_WEAK: {
+    insecure: `// core-service/src/m6/m6.service.ts
+async insecureGetUserProfile(userId: string) {
+  return {
+    user_id: userId,
+    full_name: 'John Doe',
+    email: 'john@example.com',
+    ssn: '123-45-6789',
+    credit_card: '4532-1111-2222-3333',
+    location_history: [...],
+    data_shared_with: ['marketing-agency', 'data-broker'],
+    risks: ['All PII collected', 'No consent tracking'],
+  };
+}`,
+    secure: `// core-service/src/m6/m6.service.ts
+async safeGetUserProfile(userId: string) {
+  return {
+    user_id: userId,
+    display_name: 'John D.',
+    email_for_notifications: '[email redacted]',
+    data_collection_consents: {
+      basic_profile: { consent_given: true },
+      marketing_emails: { consent_given: false },
+      location_tracking: { consent_given: false },
+    },
+    third_party_sharing: 'None',
+  };
+}`,
+  },
+  BINARY_PROTECTIONS_WEAK: {
+    insecure: `// Build configuration — INSECURE
+const buildConfig = {
+  debug_enabled: true,
+  code_obfuscation: false,
+  jailbreak_detection: false,
+  anti_tampering: false,
+  symbols_stripped: false,
+  hardcoded_secrets: 'API keys in binary',
+};`,
+    secure: `// Build configuration — SECURE
+const buildConfig = {
+  debug_enabled: false,
+  code_obfuscation: true,
+  jailbreak_detection: true,
+  anti_tampering: true,
+  symbols_stripped: true,
+  cfi_enabled: true,
+  string_encryption: 'AES-256',
+  hardcoded_secrets: 'None - all from secure config',
+};`,
+  },
+  INSECURE_DATA_STORAGE: {
+    insecure: `// core-service/src/m9/m9.service.ts
+async insecureGetStorageStatus() {
+  return {
+    device_storage: {
+      shared_preferences: {
+        encryption: 'NONE',
+        contents: { auth_token: 'plaintext', api_key: 'plaintext' },
+        accessibility: 'Readable by any app',
+      },
+      database: {
+        encryption: 'NONE',
+        tables: ['users (password_plaintext)', 'credentials'],
+      },
+    },
+    risks: ['Plaintext on disk', 'No encryption'],
+  };
+}`,
+    secure: `// core-service/src/m9/m9.service.ts
+async safeGetStorageStatus() {
+  return {
+    device_storage: {
+      keychain: {
+        encryption: 'AES-256-GCM',
+        master_key: 'Android Keystore (hardware-backed)',
+        biometric_protection: true,
+      },
+      database: {
+        encryption: 'SQLCipher (AES-256)',
+        password_derived_from: 'Keystore master key',
+      },
+    },
+    features: ['All data encrypted', 'Hardware-backed encryption'],
+  };
+}`,
+  },
 };
 
 function resolveSpec(spec: RequestSpec, values: Record<string, string>): RequestSpec {
@@ -585,36 +866,83 @@ export default function OwaspMobileRiskLabScreen() {
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [showBackendCode, setShowBackendCode] = useState<Record<string, boolean>>({});
   const [codeModeByRisk, setCodeModeByRisk] = useState<Record<string, CaseMode>>({});
-  const [fieldValues, setFieldValues] = useState<Record<string, Record<string, string>>>(() => {
-    const ts = Date.now().toString().slice(-6);
-    return {
-      PASSCODE_RATE_LIMIT_OFF: { username: "admin", password: "takasecurity" },
-      UNVALIDATED_EXTERNAL_INPUT: {
-        customerName: "' || (SELECT password FROM customers ORDER BY customer_name LIMIT 1) || '",
-        username: `sqli_${ts}`,
-        password: "testpass",
-      },
-      NET_HTTP_NO_TLS: {
-        username: "admin",
-        password: "takasecurity",
-        token: "token_alice_plaintext_abc123",
-      },
-      CRYPTO_MD5_NO_SALT: {
-        username: `cryptotest_${ts}`,
-        password: "plaintextpass",
-      },
-      SQLI_UNION_BASED: {
-        unionPayload:
-          "0 UNION SELECT 1,username,password,NULL,NULL,NULL,NULL,NULL,NULL FROM customers--",
-        safeId: "123e4567-e89b-4d3c-a456-426614174000",
-      },
-    };
-  });
+  const [fieldValues, setFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [isLoadingFields, setIsLoadingFields] = useState(true);
 
   const activeApiUrl = useMemo(
     () => apiUrl.trim() || process.env.EXPO_PUBLIC_API_URL || "https://core-service-znxz.onrender.com",
     [apiUrl],
   );
+
+  // Fetch initial field values from backend
+  useEffect(() => {
+    const fetchInitialValues = async () => {
+      try {
+        const response = await fetch(`${activeApiUrl}/samples/initial-values`);
+        if (response.ok) {
+          const data = await response.json();
+          setFieldValues(data);
+        } else {
+          // Fallback to hardcoded values if fetch fails
+          const ts = Date.now().toString().slice(-6);
+          setFieldValues({
+            PASSCODE_RATE_LIMIT_OFF: {
+              username: "admin",
+              password: "takasecurity",
+            },
+            UNVALIDATED_EXTERNAL_INPUT: {
+              customerName: `test_${ts}`,
+              username: `sqli_${ts}`,
+              password: "testpass",
+            },
+            NET_HTTP_NO_TLS: {
+              username: "admin",
+              password: "takasecurity",
+              token: "token_alice_plaintext_abc123",
+            },
+            CRYPTO_MD5_NO_SALT: {
+              username: `cryptotest_${ts}`,
+              password: "plaintextpass",
+            },
+            SQLI_UNION_BASED: {
+              unionPayload:
+                "0 UNION SELECT 1,username,password,NULL,NULL,NULL,NULL,NULL,NULL FROM customers--",
+              safeId: "123e4567-e89b-4d3c-a456-426614174000",
+            },
+          });
+        }
+      } catch (error) {
+        // Fallback to hardcoded values if fetch fails
+        const ts = Date.now().toString().slice(-6);
+        setFieldValues({
+          PASSCODE_RATE_LIMIT_OFF: { username: "admin", password: "takasecurity" },
+          UNVALIDATED_EXTERNAL_INPUT: {
+            customerName: `test_${ts}`,
+            username: `sqli_${ts}`,
+            password: "testpass",
+          },
+          NET_HTTP_NO_TLS: {
+            username: "admin",
+            password: "takasecurity",
+            token: "token_alice_plaintext_abc123",
+          },
+          CRYPTO_MD5_NO_SALT: {
+            username: `cryptotest_${ts}`,
+            password: "plaintextpass",
+          },
+          SQLI_UNION_BASED: {
+            unionPayload:
+              "0 UNION SELECT 1,username,password,NULL,NULL,NULL,NULL,NULL,NULL FROM customers--",
+            safeId: "123e4567-e89b-4d3c-a456-426614174000",
+          },
+        });
+      } finally {
+        setIsLoadingFields(false);
+      }
+    };
+
+    fetchInitialValues();
+  }, [activeApiUrl]);
 
   const runScenario = async (risk: RiskItem, mode: "insecure" | "secure") => {
     if (risk.issueCode === "MISCONF_FLAG_SECURE_OFF") {
@@ -762,7 +1090,9 @@ export default function OwaspMobileRiskLabScreen() {
               </View>
             ))}
 
-            <View style={styles.buttonRow}>
+           {risk.owasp2024 !== 'M8' && (
+            <>
+             <View style={styles.buttonRow}>
               <Pressable
                 style={[styles.button, styles.insecureBtn]}
                 onPress={() => runScenario(risk, "insecure")}
@@ -809,6 +1139,8 @@ export default function OwaspMobileRiskLabScreen() {
                 {isCodeVisible ? "Hide BE Code" : "Show BE Code"}
               </Text>
             </Pressable>
+            </>
+            )}
 
             {isCodeVisible && backendCode && (
               <View style={styles.codePanel}>
@@ -925,9 +1257,17 @@ export default function OwaspMobileRiskLabScreen() {
             )}
 
             {risk.issueCode === "MISCONF_FLAG_SECURE_OFF" && (
-              <Text style={styles.hintText}>
-                This item opens FLAG_SECURE demo because the risk is validated on-device UI behavior.
-              </Text>
+              <>
+                <Text style={styles.hintText}>
+                  This risk is validated on-device UI behavior. Tap below to see the FLAG_SECURE demo.
+                </Text>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/flag-secure")}
+                >
+                  <Text style={styles.buttonText}>Demo FLAG_SECURE</Text>
+                </Pressable>
+              </>
             )}
           </View>
         );

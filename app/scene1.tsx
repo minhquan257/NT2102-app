@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
     ScrollView,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 
 export default function DisableRateLimitScreen() {
+  const router = useRouter();
   const MAX_ATTEMPTS = 5;
   const LOCK_TIME = 30000; // 30s
   const CORRECT_PIN = "1234";
@@ -93,6 +95,12 @@ export default function DisableRateLimitScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backButtonText}>← Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>⚠️ Security Vulnerability</Text>
 
       {/* SWITCH */}
@@ -181,6 +189,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
     backgroundColor: "#0b1726",
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    color: "#9ecdf5",
+    fontSize: 16,
+    fontWeight: "500",
   },
   title: {
     fontSize: 26,

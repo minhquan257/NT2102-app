@@ -1,18 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ScreenCapture from "expo-screen-capture";
 import React, { useRef, useState } from "react";
 import {
-    Alert,
-    AppState,
-    AppStateStatus,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  AppState,
+  AppStateStatus,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
   type CodeTokenKind =
@@ -349,6 +350,7 @@ export default function SecureScreen() {
 }`;
 
 export default function FlagSecureScreen() {
+  const router = useRouter();
   const [isSecureMode, setIsSecureMode] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [selectedCodeTab, setSelectedCodeTab] = useState<'android' | 'ios' | 'rn'>('android');
@@ -467,8 +469,16 @@ export default function FlagSecureScreen() {
       <ScrollView style={styles.container}>
       {/* Header Section */}
       <View style={styles.header}>
-        <Text style={styles.title}>FLAG_SECURE Demo</Text>
-        <Text style={styles.subtitle}>Security Misconfiguration Testing</Text>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#9ecdf5" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>FLAG_SECURE Demo</Text>
+          <Text style={styles.subtitle}>Security Misconfiguration Testing</Text>
+        </View>
       </View>
 
       {/* Security Status */}
@@ -748,10 +758,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#0b1726",
   },
   header: {
-    padding: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#12263f",
     borderBottomWidth: 1,
     borderBottomColor: "#255789",
+  },
+  backButton: {
+    marginRight: 12,
+    marginTop: 6,
+    padding: 4,
   },
   title: {
     fontSize: 28,
@@ -1168,9 +1186,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#74b8ed",
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    width: "100%",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    minWidth: 200,
+    maxWidth: "85%",
   },
   overlayCloseButtonContent: {
     flexDirection: "row",
