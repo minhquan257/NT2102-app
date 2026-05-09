@@ -2,13 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
-  DrawerItem,
   DrawerItemList,
 } from "@react-navigation/drawer";
-import { usePathname, useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import React from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const styles = StyleSheet.create({
@@ -16,8 +14,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tinyLogo: {
-    width: 60,
-    height: 60,
+    width: 100,
+    height: 100,
     alignSelf: "center",
   },
   logo: {
@@ -27,46 +25,20 @@ const styles = StyleSheet.create({
 });
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const menuItems = [
-    {
-      id: 42,
-      title: "Item 42",
-    },
-    {
-      id: 43,
-      title: "Item 43",
-    },
-    {
-      id: 44,
-      title: "Item 44",
-    },
-  ];
-  const router = useRouter();
-  const pathName = usePathname();
-
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={{
+        backgroundColor: "#fff",
+      }}
+    >
       <Image
         style={styles.tinyLogo}
-        source={require("@/assets/images/react-logo.png")}
+        resizeMode="contain"
+        source={require("@/assets/images/OIP.jpg")}
       />
+      <View style={{ flex: 1, backgroundColor: "#fff", paddingTop: 10 }}></View>
       <DrawerItemList {...props} />
-      <View style={{ padding: 16, paddingTop: 40 }}>
-        <Text style={{ fontSize: 16, fontWeight: "bold" }}>Items</Text>
-      </View>
-      {menuItems.map((item) => {
-        const isActive = pathName === `/${item.id}`;
-        return (
-          <DrawerItem
-            focused={isActive}
-            key={item.id}
-            label={item.title}
-            onPress={() => {
-              router.push(`/${item.id}`);
-            }}
-          />
-        );
-      })}
     </DrawerContentScrollView>
   );
 }
@@ -80,8 +52,17 @@ export default function Layout() {
           drawerStyle: {
             backgroundColor: "#ccc", // 👈 màu nền
           },
-          drawerActiveBackgroundColor: "#e6f7ff",
-          drawerActiveTintColor: "blue",
+          drawerActiveBackgroundColor: "#aa18ea",
+          drawerItemStyle: {
+            borderRadius: 20,
+          },
+          drawerActiveTintColor: "#fff",
+          drawerInactiveTintColor: "#333",
+          drawerLabelStyle: {
+            // marginLeft: -25,
+            fontFamily: "Roboto-Medium",
+            fontSize: 15,
+          },
           drawerHideStatusBarOnOpen: true,
         }}
       >
@@ -94,24 +75,90 @@ export default function Layout() {
           options={{
             drawerLabel: "Disable passcode rate limit",
             title: "Disable passcode rate limit",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name={"lock-open"} size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888", // 👈 xám đậm
+              fontWeight: "600",
+            },
             drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
-          name="news"
+          name="scene2"
           options={{
-            drawerLabel: "OWASP Mobile Risk Lab",
-            title: "OWASP Mobile Risk Lab",
+            drawerLabel: "Plaintext password in SharedPreferences",
+            title: "Plaintext password in SharedPreferences",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="newspaper" size={size} color={color} />
             ),
             headerTitleStyle: {
               color: "#888", // 👈 xám đậm
               fontWeight: "600",
+              fontFamily: "Roboto-Medium",
+              fontSize: 15,
             },
-            drawerLabelStyle: {
-              color: "#888", // 👈 xám đậm
-              fontSize: 14,
+          }}
+        />
+        <Drawer.Screen
+          name="scene3"
+          options={{
+            drawerLabel: "PII logged in plain text",
+            title:
+              "Personal Identifiable Information (PII) logged in plain text",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="newspaper" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="scene4"
+          options={{
+            drawerLabel: "World-readable exportable file",
+            title: "World-readable exportable file",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="folder" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="sqlInjection"
+          options={{
+            drawerLabel: "SQL Injection",
+            title: "SQL Injection Demo",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="newspaper" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
+            },
+          }}
+        />
+        <Drawer.Screen
+          name="insecureCommunication"
+          options={{
+            drawerLabel: "Insecure Communication",
+            title: "Insecure Communication Demo",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="lock-open" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#888",
+              fontWeight: "600",
+              fontSize: 13,
             },
           }}
         />
