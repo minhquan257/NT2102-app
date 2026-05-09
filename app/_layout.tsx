@@ -67,7 +67,11 @@ export default function Layout() {
         }}
       >
         <Drawer.Screen
-          name="scene1" // This is the name of the page and must match the url from root
+          name="index"
+          options={{ drawerItemStyle: { display: "none" } }}
+        />
+        <Drawer.Screen
+          name="scene1"
           options={{
             drawerLabel: "Disable passcode rate limit",
             title: "Disable passcode rate limit",
@@ -78,6 +82,7 @@ export default function Layout() {
               color: "#888", // 👈 xám đậm
               fontWeight: "600",
             },
+            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
@@ -155,6 +160,14 @@ export default function Layout() {
               fontWeight: "600",
               fontSize: 13,
             },
+          }}
+        />
+        <Drawer.Screen
+          name="flag-secure"
+          options={{
+            drawerLabel: "FLAG_SECURE Demo",
+            title: "FLAG_SECURE Security Demo",
+            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen

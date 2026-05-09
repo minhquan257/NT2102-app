@@ -1,12 +1,12 @@
 import React, { useRef, useState } from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function DisableRateLimitScreen() {
@@ -97,7 +97,7 @@ export default function DisableRateLimitScreen() {
 
       {/* SWITCH */}
       <View style={styles.switchContainer}>
-        <Text style={{ color: "#fff" }}>
+        <Text style={{ color: "#d9f0ff" }}>
           {isSecureMode ? "🔐 Secure Mode" : "🔓 Insecure Mode"}
         </Text>
         <Switch value={isSecureMode} onValueChange={handleToggleMode} />
@@ -180,12 +180,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#5ba6b4",
+    backgroundColor: "#0b1726",
   },
   title: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#ccc",
+    color: "#d9f0ff",
     marginBottom: 10,
   },
   switchContainer: {
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   description: {
-    color: "#ccc",
+    color: "#98bbd6",
     marginBottom: 30,
   },
   pinContainer: {
@@ -209,15 +209,15 @@ const styles = StyleSheet.create({
     width: 50,
     height: 60,
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#2e5b87",
     textAlign: "center",
     fontSize: 24,
     borderRadius: 12,
-    backgroundColor: "#1e1e1e",
-    color: "#fff",
+    backgroundColor: "#091424",
+    color: "#ecf6ff",
   },
   button: {
-    backgroundColor: "#ff4d4d",
+    backgroundColor: "#b83d4b",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -229,17 +229,17 @@ const styles = StyleSheet.create({
   },
   attempts: {
     marginTop: 20,
-    color: "#6deb79",
+    color: "#61d78b",
     textAlign: "center",
   },
   message: {
     marginTop: 10,
     fontSize: 18,
-    color: "#fff",
+    color: "#ecf6ff",
     textAlign: "center",
   },
   codeButton: {
-    backgroundColor: "#333",
+    backgroundColor: "#1a3553",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
@@ -248,19 +248,19 @@ const styles = StyleSheet.create({
 
   codeContainer: {
     marginTop: 20,
-    backgroundColor: "#1e1e1e",
+    backgroundColor: "#07111d",
     padding: 15,
     borderRadius: 10,
   },
 
   codeTitle: {
-    color: "#ffcc00",
+    color: "#f6c177",
     fontWeight: "bold",
     marginTop: 10,
   },
 
   codeBlock: {
-    color: "#00ffcc",
+    color: "#9ecdf5",
     fontFamily: "monospace",
     marginTop: 5,
   },

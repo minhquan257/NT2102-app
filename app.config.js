@@ -10,10 +10,14 @@ export default {
     scheme: "secureapp",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
+    cli: {
+      appVersionSource: "appJson",
+    },
     ios: {
       supportsTablet: true,
     },
     android: {
+      package: "com.secureapp",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -48,7 +52,10 @@ export default {
       reactCompiler: true,
     },
     extra: {
-      apiUrl: process.env.API_URL,
+      eas: {
+        projectId: "978392be-a0a9-4c23-956b-de61fa39d723",
+      },
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
     },
   },
 };
