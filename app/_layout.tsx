@@ -2,13 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
-  DrawerItem,
   DrawerItemList,
 } from "@react-navigation/drawer";
-import { usePathname, useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import React from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const styles = StyleSheet.create({
@@ -16,8 +14,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tinyLogo: {
-    width: 60,
-    height: 60,
+    width: 100,
+    height: 100,
     alignSelf: "center",
   },
   logo: {
@@ -27,46 +25,20 @@ const styles = StyleSheet.create({
 });
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const menuItems = [
-    {
-      id: 42,
-      title: "Item 42",
-    },
-    {
-      id: 43,
-      title: "Item 43",
-    },
-    {
-      id: 44,
-      title: "Item 44",
-    },
-  ];
-  const router = useRouter();
-  const pathName = usePathname();
-
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={{
+        backgroundColor: "#fff",
+      }}
+    >
       <Image
         style={styles.tinyLogo}
-        source={require("@/assets/images/react-logo.png")}
+        resizeMode="contain"
+        source={require("@/assets/images/OIP.jpg")}
       />
+      <View style={{ flex: 1, backgroundColor: "#fff", paddingTop: 10 }}></View>
       <DrawerItemList {...props} />
-      <View style={{ padding: 16, paddingTop: 40 }}>
-        <Text style={{ fontSize: 16, fontWeight: "bold" }}>Items</Text>
-      </View>
-      {menuItems.map((item) => {
-        const isActive = pathName === `/${item.id}`;
-        return (
-          <DrawerItem
-            focused={isActive}
-            key={item.id}
-            label={item.title}
-            onPress={() => {
-              router.push(`/${item.id}`);
-            }}
-          />
-        );
-      })}
     </DrawerContentScrollView>
   );
 }
@@ -80,8 +52,17 @@ export default function Layout() {
           drawerStyle: {
             backgroundColor: "#ccc", // 👈 màu nền
           },
-          drawerActiveBackgroundColor: "#e6f7ff",
-          drawerActiveTintColor: "blue",
+          drawerActiveBackgroundColor: "#aa18ea",
+          drawerItemStyle: {
+            borderRadius: 20,
+          },
+          drawerActiveTintColor: "#fff",
+          drawerInactiveTintColor: "#333",
+          drawerLabelStyle: {
+            // marginLeft: -25,
+            fontFamily: "Roboto-Medium",
+            fontSize: 15,
+          },
           drawerHideStatusBarOnOpen: true,
         }}
       >
@@ -97,10 +78,6 @@ export default function Layout() {
               color: "#888", // 👈 xám đậm
               fontWeight: "600",
             },
-            drawerLabelStyle: {
-              color: "#888", // 👈 xám đậm
-              fontSize: 14,
-            },
           }}
         />
         <Drawer.Screen
@@ -114,10 +91,8 @@ export default function Layout() {
             headerTitleStyle: {
               color: "#888", // 👈 xám đậm
               fontWeight: "600",
-            },
-            drawerLabelStyle: {
-              color: "#888", // 👈 xám đậm
-              fontSize: 14,
+              fontFamily: "Roboto-Medium",
+              fontSize: 15,
             },
           }}
         />
@@ -135,10 +110,6 @@ export default function Layout() {
               fontWeight: "600",
               fontSize: 13,
             },
-            drawerLabelStyle: {
-              color: "#888",
-              fontSize: 14,
-            },
           }}
         />
         <Drawer.Screen
@@ -153,10 +124,6 @@ export default function Layout() {
               color: "#888",
               fontWeight: "600",
               fontSize: 13,
-            },
-            drawerLabelStyle: {
-              color: "#888",
-              fontSize: 14,
             },
           }}
         />
@@ -173,10 +140,6 @@ export default function Layout() {
               fontWeight: "600",
               fontSize: 13,
             },
-            drawerLabelStyle: {
-              color: "#888",
-              fontSize: 14,
-            },
           }}
         />
         <Drawer.Screen
@@ -191,10 +154,6 @@ export default function Layout() {
               color: "#888",
               fontWeight: "600",
               fontSize: 13,
-            },
-            drawerLabelStyle: {
-              color: "#888",
-              fontSize: 14,
             },
           }}
         />
