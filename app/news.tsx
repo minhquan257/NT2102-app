@@ -218,10 +218,10 @@ const RISKS: RiskItem[] = [
   },
   {
     issueCode: "SUPPLY_CHAIN_SECURITY_WEAK",
-    title: "Inadequate supply chain security",
+    title: "Old library / dependency risk",
     owasp2024: "M2",
     description:
-      "Risk from untrusted dependencies, tampered artifacts, or missing integrity checks in build pipelines.",
+      "Outdated libraries can introduce known vulnerabilities; the secure flow audits and scans dependencies before release.",
     insecureSpecs: [
       {
         method: "GET",
@@ -264,46 +264,46 @@ const RISKS: RiskItem[] = [
       },
     ],
   },
-  {
-    issueCode: "UNVALIDATED_EXTERNAL_INPUT",
-    title: "Unvalidated external input (SQLi via INSERT)",
-    owasp2024: "M4",
-    description:
-      "Raw string interpolation in SQL INSERT lets an attacker break out of string literals and inject arbitrary SQL.",
-    insecureSpecs: [
-      {
-        method: "POST",
-        path: "/sqli/create",
-        body: {
-          customerName: "{{customerName}}",
-          contactName: "Bob",
-          address: "123 Main St",
-          city: "New York",
-          postalCode: "10001",
-          country: "US",
-          password: "{{password}}",
-          username: "{{username}}",
-        },
-      },
-    ],
-    secureSpecs: [
-      {
-        method: "POST",
-        path: "/sqli/safe/create",
-        body: {
-          customerName: "Safe User",
-          contactName: "Safe Contact",
-          address: "1 Main Street",
-          city: "HCM",
-          postalCode: "700000",
-          country: "VN",
-          password: "{{password}}",
-          username: "{{username}}",
-          phoneNumber: "0901234567",
-        },
-      },
-    ],
-  },
+  // {
+  //   issueCode: "UNVALIDATED_EXTERNAL_INPUT",
+  //   title: "Unvalidated external input (SQLi via INSERT)",
+  //   owasp2024: "M4",
+  //   description:
+  //     "Raw string interpolation in SQL INSERT lets an attacker break out of string literals and inject arbitrary SQL.",
+  //   insecureSpecs: [
+  //     {
+  //       method: "POST",
+  //       path: "/sqli/create",
+  //       body: {
+  //         customerName: "{{customerName}}",
+  //         contactName: "Bob",
+  //         address: "123 Main St",
+  //         city: "New York",
+  //         postalCode: "10001",
+  //         country: "US",
+  //         password: "{{password}}",
+  //         username: "{{username}}",
+  //       },
+  //     },
+  //   ],
+  //   secureSpecs: [
+  //     {
+  //       method: "POST",
+  //       path: "/sqli/safe/create",
+  //       body: {
+  //         customerName: "Safe User",
+  //         contactName: "Safe Contact",
+  //         address: "1 Main Street",
+  //         city: "HCM",
+  //         postalCode: "700000",
+  //         country: "VN",
+  //         password: "{{password}}",
+  //         username: "{{username}}",
+  //         phoneNumber: "0901234567",
+  //       },
+  //     },
+  //   ],
+  // },
   {
     issueCode: "SQLI_UNION_BASED",
     title: "Union-based SQL injection (data exfiltration)",
@@ -382,7 +382,7 @@ const RISKS: RiskItem[] = [
     title: "Insufficient binary protections",
     owasp2024: "M7",
     description:
-      "Missing anti-tamper, anti-debug, and hardening controls increases risk of reverse engineering and runtime manipulation.",
+      "Missing hardening makes it easier to read runtime behavior; the demo shows a plain log call versus an obfuscated one.",
     insecureSpecs: [
       {
         method: "GET",
@@ -453,10 +453,10 @@ const RISKS: RiskItem[] = [
   },
   {
     issueCode: "CRYPTO_MD5_NO_SALT",
-    title: "Plaintext / weak password storage",
+    title: "Weak password hashing",
     owasp2024: "M10",
     description:
-      "Insecure endpoint stores the raw password in the DB. Secure endpoint hashes it with bcrypt (12 rounds) before storage.",
+      "Fast hashes like MD5/SHA1 are easy to crack; the secure flow uses bcrypt with a random salt.",
     insecureSpecs: [
       {
         method: "POST",
@@ -498,11 +498,11 @@ const RISK_FIELD_DEFS: Record<string, FieldDef[]> = {
     { key: "username", label: "Username" },
     { key: "password", label: "Password", secure: true },
   ],
-  UNVALIDATED_EXTERNAL_INPUT: [
-    { key: "customerName", label: "Customer Name (try SQL injection)" },
-    { key: "username", label: "Username" },
-    { key: "password", label: "Password", secure: true },
-  ],
+  // UNVALIDATED_EXTERNAL_INPUT: [
+  //   { key: "customerName", label: "Customer Name (try SQL injection)" },
+  //   { key: "username", label: "Username" },
+  //   { key: "password", label: "Password", secure: true },
+  // ],
   NET_HTTP_NO_TLS: [
     { key: "username", label: "Username" },
     { key: "password", label: "Password", secure: true },
@@ -510,7 +510,7 @@ const RISK_FIELD_DEFS: Record<string, FieldDef[]> = {
   ],
   CRYPTO_MD5_NO_SALT: [
     { key: "username", label: "Username" },
-    { key: "password", label: "Password (stored raw vs bcrypt)" },
+    { key: "password", label: "Password (MD5/SHA1 vs bcrypt + salt)" },
   ],
   SQLI_UNION_BASED: [
     {
@@ -560,29 +560,29 @@ async safeLogin(username: string, password: string) {
 res.setHeader('Strict-Transport-Security',
   'max-age=63072000; includeSubDomains; preload');`,
   },
-  UNVALIDATED_EXTERNAL_INPUT: {
-    insecure: `// core-service/src/sqli/sqli.service.ts
-async unsafeCreate(body: Record<string, any>) {
-  const sql = \
-\
-    INSERT INTO customers (...)
-    VALUES ('\${customerName}', '\${contactName}', ..., '\${username}')
-    RETURNING customer_id, customer_name, username
-  \
-\
-  ;
-  return this.dataSource.query(sql);
-}`,
-    secure: `// core-service/src/sqli/sqli.service.ts
-async safeCreate(dto: CreateCustomerDto) {
-  if (!dto.customerName || dto.customerName.length > 255) {
-    throw new BadRequestException('customerName is required and must be ≤255 characters');
-  }
-  const hashedPassword = await bcrypt.hash(dto.password, 10);
-  const customer = this.safeCustomerRepo.create({ ...dto, passwordHash: hashedPassword });
-  return this.safeCustomerRepo.save(customer);
-}`,
-  },
+  // UNVALIDATED_EXTERNAL_INPUT: {
+  //   insecure: `// core-service/src/sqli/sqli.service.ts
+  // async unsafeCreate(body: Record<string, any>) {
+  //   const sql = \
+  // \
+  //     INSERT INTO customers (...)
+  //     VALUES ('\${customerName}', '\${contactName}', ..., '\${username}')
+  //     RETURNING customer_id, customer_name, username
+  // \
+  // \
+  //   ;
+  //   return this.dataSource.query(sql);
+  // }`,
+  //   secure: `// core-service/src/sqli/sqli.service.ts
+  // async safeCreate(dto: CreateCustomerDto) {
+  //   if (!dto.customerName || dto.customerName.length > 255) {
+  //     throw new BadRequestException('customerName is required and must be <=255 characters');
+  //   }
+  //   const hashedPassword = await bcrypt.hash(dto.password, 10);
+  //   const customer = this.safeCustomerRepo.create({ ...dto, passwordHash: hashedPassword });
+  //   return this.safeCustomerRepo.save(customer);
+  // }`,
+  // },
   NET_HTTP_NO_TLS: {
     insecure: `// core-service/src/m5/m5.controller.ts
 @Get('sensitive-data')
@@ -607,26 +607,20 @@ async safeLogin(...) {
 }`,
   },
   CRYPTO_MD5_NO_SALT: {
-    insecure: `// core-service/src/sqli/sqli.service.ts
-async unsafeCreate(body: Record<string, any>) {
-  const sql = \
-\
-    INSERT INTO customers (..., password, username)
-    VALUES (..., '\${password}', '\${username}')
-  \
-\
-  ;
-  return this.dataSource.query(sql); // plaintext password stored
-}`,
-    secure: `// core-service/src/sqli/sqli.service.ts
-async safeCreate(dto: CreateCustomerDto) {
-  const hashedPassword = await bcrypt.hash(dto.password, 10);
-  const customer = this.safeCustomerRepo.create({
-    ...dto,
-    passwordHash: hashedPassword,
-  });
-  return this.safeCustomerRepo.save(customer);
-}`,
+    insecure: `// app/m10PasswordHashing.tsx
+import MD5 from 'crypto-js/md5';
+import SHA1 from 'crypto-js/sha1';
+
+const md5Hash = MD5(password).toString();
+const sha1Hash = SHA1(password).toString();
+const result = { md5Hash, sha1Hash };`,
+    secure: `// app/m10PasswordHashing.tsx
+import bcrypt from 'bcryptjs';
+
+const saltRounds = 12;
+const salt = await bcrypt.genSalt(saltRounds);
+const passwordHash = await bcrypt.hash(password, salt);
+const result = { saltRounds, salt, passwordHash };`,
   },
   SQLI_UNION_BASED: {
     insecure: `// core-service/src/sqli/sqli.service.ts
@@ -686,7 +680,7 @@ async insecureCheckDependencies() {
       { name: 'lodash', version: '4.17.15', vulnerabilities: 1, severity: 'HIGH', cve: 'CVE-2019-10744' },
       { name: 'express', version: '4.16.2', vulnerabilities: 5, severity: 'HIGH' },
     ],
-    risks: ['Known RCE vulnerabilities', 'No artifact signing'],
+    risks: ['Known library vulnerabilities', 'No dependency audit', 'No SBOM or scanning gate'],
   };
 }`,
     secure: `// core-service/src/m2/m2.service.ts
@@ -697,9 +691,9 @@ async safeCheckDependencies() {
       { name: 'express', version: '4.18.2', vulnerabilities: 0 },
     ],
     security_measures: [
-      'Weekly vulnerability scanning',
-      'Artifacts signed with GPG',
-      'SBOM generated and signed',
+      'npm audit run in CI before release',
+      'Dependency tree scanned with npm ls / npm audit',
+      'Alerts block builds when high severity issues are found',
     ],
   };
 }`,
@@ -734,26 +728,13 @@ async safeGetUserProfile(userId: string) {
 }`,
   },
   BINARY_PROTECTIONS_WEAK: {
-    insecure: `// Build configuration — INSECURE
-const buildConfig = {
-  debug_enabled: true,
-  code_obfuscation: false,
-  jailbreak_detection: false,
-  anti_tampering: false,
-  symbols_stripped: false,
-  hardcoded_secrets: 'API keys in binary',
-};`,
-    secure: `// Build configuration — SECURE
-const buildConfig = {
-  debug_enabled: false,
-  code_obfuscation: true,
-  jailbreak_detection: true,
-  anti_tampering: true,
-  symbols_stripped: true,
-  cfi_enabled: true,
-  string_encryption: 'AES-256',
-  hardcoded_secrets: 'None - all from secure config',
-};`,
+    insecure: `// app/m7Obfuscation.tsx
+console.log('Hello World');`,
+    secure: `// app/m7Obfuscation.tsx
+const encodedMessage = 'SGVsbG8gV29ybGQ=';
+const logMethod = console['lo' + 'g'];
+const decodedMessage = atob(encodedMessage);
+logMethod(decodedMessage);`,
   },
   INSECURE_DATA_STORAGE: {
     insecure: `// core-service/src/m9/m9.service.ts
@@ -902,11 +883,11 @@ export default function OwaspMobileRiskLabScreen() {
               username: "admin",
               password: "takasecurity",
             },
-            UNVALIDATED_EXTERNAL_INPUT: {
-              customerName: `test_${ts}`,
-              username: `sqli_${ts}`,
-              password: "testpass",
-            },
+            // UNVALIDATED_EXTERNAL_INPUT: {
+            //   customerName: `test_${ts}`,
+            //   username: `sqli_${ts}`,
+            //   password: "testpass",
+            // },
             NET_HTTP_NO_TLS: {
               username: "admin",
               password: "takasecurity",
@@ -957,6 +938,22 @@ export default function OwaspMobileRiskLabScreen() {
   }, [activeApiUrl]);
 
   const runScenario = async (risk: RiskItem, mode: "insecure" | "secure") => {
+    if (risk.issueCode === "IMPROPER_CREDENTIAL_USAGE") {
+      router.push({ pathname: "/m1Credential", params: { mode } });
+      return;
+    }
+    if (risk.issueCode === "SUPPLY_CHAIN_SECURITY_WEAK") {
+      router.push({ pathname: "/m2Dependency", params: { mode } });
+      return;
+    }
+    if (risk.issueCode === "BINARY_PROTECTIONS_WEAK") {
+      router.push({ pathname: "/m7Obfuscation", params: { mode } });
+      return;
+    }
+    if (risk.issueCode === "CRYPTO_MD5_NO_SALT") {
+      router.push({ pathname: "/m10PasswordHashing", params: { mode } });
+      return;
+    }
     if (risk.issueCode === "PASSCODE_RATE_LIMIT_OFF") {
       router.push("/scene1");
       return;
@@ -974,7 +971,7 @@ export default function OwaspMobileRiskLabScreen() {
       return;
     }
     if (
-      risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
+      // risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
       risk.issueCode === "SQLI_UNION_BASED" ||
       risk.issueCode === "INSECURE_DATA_STORAGE" ||
       risk.issueCode === "INSECURE_DATA_STORAGE_FILE_LEAK"
@@ -1007,8 +1004,8 @@ export default function OwaspMobileRiskLabScreen() {
     const runValues = { ...userValues };
 
     if (
-      (risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
-        risk.issueCode === "CRYPTO_MD5_NO_SALT") &&
+      // (risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
+        risk.issueCode === "CRYPTO_MD5_NO_SALT" &&
       runValues.username
     ) {
       runValues.username = `${runValues.username}_${Date.now().toString().slice(-5)}`;
@@ -1092,9 +1089,13 @@ export default function OwaspMobileRiskLabScreen() {
         const codeText = backendCode ? backendCode[selectedMode] : "";
         const codeLines = codeText.split("\n");
         const isRedirectOnlyCase = [
+          "IMPROPER_CREDENTIAL_USAGE",
+          "SUPPLY_CHAIN_SECURITY_WEAK",
+          "BINARY_PROTECTIONS_WEAK",
+          "CRYPTO_MD5_NO_SALT",
           "PASSCODE_RATE_LIMIT_OFF",
           "MISCONF_FLAG_SECURE_OFF",
-          "UNVALIDATED_EXTERNAL_INPUT",
+          // "UNVALIDATED_EXTERNAL_INPUT",
           "SQLI_UNION_BASED",
           "NET_HTTP_NO_TLS",
           "PRIVACY_CONTROLS_WEAK",
@@ -1301,6 +1302,50 @@ export default function OwaspMobileRiskLabScreen() {
               </>
             )}
 
+            {risk.issueCode === "IMPROPER_CREDENTIAL_USAGE" && (
+              <>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/m1Credential")}
+                >
+                  <Text style={styles.buttonText}>IMPROPER CREDENTIAL USAGE (M1)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "SUPPLY_CHAIN_SECURITY_WEAK" && (
+              <>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/m2Dependency")}
+                >
+                  <Text style={styles.buttonText}>INADEQUATE SUPPLY CHAIN SECURITY (M2)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "BINARY_PROTECTIONS_WEAK" && (
+              <>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/m7Obfuscation")}
+                >
+                  <Text style={styles.buttonText}>INSUFFICIENT BINARY PROTECTIONS (M7)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "CRYPTO_MD5_NO_SALT" && (
+              <>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/m10PasswordHashing")}
+                >
+                  <Text style={styles.buttonText}>WEAK PASSWORD HASHING (M10)</Text>
+                </Pressable>
+              </>
+            )}
+
             {risk.issueCode === "MISCONF_FLAG_SECURE_OFF" && (
               <>
 
@@ -1336,14 +1381,14 @@ export default function OwaspMobileRiskLabScreen() {
               </>
             )}
 
-            {(risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ) && (
+            {(risk.issueCode === "INSECURE_DATA_STORAGE_FILE_LEAK" ) && (
               <>
 
                 <Pressable
                   style={styles.demoBtn}
                   onPress={() => router.push("/scene4")}
                 >
-                  <Text style={styles.buttonText}>UNVALIDATED EXTERNAL INPUT (M4)</Text>
+                  <Text style={styles.buttonText}>INSECURE DATA STORAGE FILE LEAK (M9)</Text>
                 </Pressable>
               </>
             )}

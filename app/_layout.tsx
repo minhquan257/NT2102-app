@@ -190,6 +190,38 @@ export default function Layout() {
           }}
         />
         <Drawer.Screen
+          name="m1Credential"
+          options={{
+            drawerLabel: "M1 Credential Usage",
+            title: "M1 Credential Usage Demo",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+        <Drawer.Screen
+          name="m2Dependency"
+          options={{
+            drawerLabel: "M2 Dependency Security",
+            title: "M2 Dependency Security Demo",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+        <Drawer.Screen
+          name="m7Obfuscation"
+          options={{
+            drawerLabel: "M7 Binary Protections",
+            title: "M7 Binary Protections Demo",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+        <Drawer.Screen
+          name="m10PasswordHashing"
+          options={{
+            drawerLabel: "M10 Password Hashing",
+            title: "M10 Password Hashing Demo",
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+        <Drawer.Screen
           name="flag-secure"
           options={{
             drawerLabel: "FLAG_SECURE Demo",
