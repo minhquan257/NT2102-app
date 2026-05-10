@@ -6,7 +6,7 @@ import {
 } from "@react-navigation/drawer";
 import { Drawer } from "expo-router/drawer";
 import React from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const styles = StyleSheet.create({
@@ -48,7 +48,7 @@ export default function Layout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Drawer
         drawerContent={CustomDrawerContent}
-        screenOptions={{
+        screenOptions={({ navigation, route }) => ({
           drawerStyle: {
             backgroundColor: "#ccc", // 👈 màu nền
           },
@@ -64,11 +64,38 @@ export default function Layout() {
             fontSize: 15,
           },
           drawerHideStatusBarOnOpen: true,
-        }}
+          headerLeft:
+            route.name === "news" || route.name === "index"
+              ? undefined
+              : () => (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("news")}
+                    style={{ marginLeft: 12, paddingVertical: 6, paddingHorizontal: 10 }}
+                    accessibilityLabel="Back to News"
+                  >
+                    <Ionicons name="arrow-back" size={22} color="#2563eb" />
+                  </TouchableOpacity>
+                ),
+        })}
       >
         <Drawer.Screen
           name="index"
           options={{ drawerItemStyle: { display: "none" } }}
+        />
+        <Drawer.Screen
+          name="news"
+          options={{
+            drawerLabel: "OWASP Mobile 2024 Risk Lab",
+            title: "OWASP Mobile 2024 Risk Lab",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="shield-checkmark" size={size} color={color} />
+            ),
+            headerTitleStyle: {
+              color: "#222",
+              fontWeight: "700",
+              fontSize: 20,
+            },
+          }}
         />
         <Drawer.Screen
           name="scene1"

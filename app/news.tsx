@@ -27,6 +27,7 @@ type RiskItem = {
   description: string;
   insecureSpecs: RequestSpec[];
   secureSpecs: RequestSpec[];
+  navigateTo?: string;
 };
 
 type FieldDef = {
@@ -414,7 +415,7 @@ const RISKS: RiskItem[] = [
   },
   {
     issueCode: "INSECURE_DATA_STORAGE",
-    title: "Insecure data storage",
+    title: "Insecure Data Storage",
     owasp2024: "M9",
     description:
       "Sensitive data at rest is exposed when stored without strong encryption, key protection, or lifecycle controls.",
@@ -438,6 +439,17 @@ const RISKS: RiskItem[] = [
         path: "/m9/safe-cache-status",
       },
     ],
+    navigateTo: "scene4.tsx",
+  },
+  {
+    issueCode: "INSECURE_DATA_STORAGE_FILE_LEAK",
+    title: "File leak storage exposure",
+    owasp2024: "M9",
+    description:
+      "Exportable files in shared locations can expose sensitive tokens and secrets to other apps or users.",
+    insecureSpecs: [],
+    secureSpecs: [],
+    navigateTo: "scene4.tsx",
   },
   {
     issueCode: "CRYPTO_MD5_NO_SALT",
@@ -945,8 +957,33 @@ export default function OwaspMobileRiskLabScreen() {
   }, [activeApiUrl]);
 
   const runScenario = async (risk: RiskItem, mode: "insecure" | "secure") => {
+    if (risk.issueCode === "PASSCODE_RATE_LIMIT_OFF") {
+      router.push("/scene1");
+      return;
+    }
     if (risk.issueCode === "MISCONF_FLAG_SECURE_OFF") {
       router.push("/flag-secure");
+      return;
+    }
+    if (risk.issueCode === "INSECURE_DATA_STORAGE") {
+      router.push("/scene2");
+      return;
+    }
+    if (risk.issueCode === "PRIVACY_CONTROLS_WEAK") {
+      router.push("/scene3");
+      return;
+    }
+    if (
+      risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ||
+      risk.issueCode === "SQLI_UNION_BASED" ||
+      risk.issueCode === "INSECURE_DATA_STORAGE" ||
+      risk.issueCode === "INSECURE_DATA_STORAGE_FILE_LEAK"
+    ) {
+      router.push("/scene4");
+      return;
+    }
+    if (risk.issueCode === "NET_HTTP_NO_TLS") {
+      router.push("/insecureCommunication");
       return;
     }
 
@@ -1054,6 +1091,16 @@ export default function OwaspMobileRiskLabScreen() {
         const isCodeVisible = !!showBackendCode[risk.issueCode];
         const codeText = backendCode ? backendCode[selectedMode] : "";
         const codeLines = codeText.split("\n");
+        const isRedirectOnlyCase = [
+          "PASSCODE_RATE_LIMIT_OFF",
+          "MISCONF_FLAG_SECURE_OFF",
+          "UNVALIDATED_EXTERNAL_INPUT",
+          "SQLI_UNION_BASED",
+          "NET_HTTP_NO_TLS",
+          "PRIVACY_CONTROLS_WEAK",
+          "INSECURE_DATA_STORAGE",
+          "INSECURE_DATA_STORAGE_FILE_LEAK",
+        ].includes(risk.issueCode);
 
         return (
           <View key={risk.issueCode} style={styles.card}>
@@ -1067,7 +1114,7 @@ export default function OwaspMobileRiskLabScreen() {
             <Text style={styles.riskTitle}>{risk.title}</Text>
             <Text style={styles.riskDescription}>{risk.description}</Text>
 
-            {(RISK_FIELD_DEFS[risk.issueCode] ?? []).map((field) => (
+            {!isRedirectOnlyCase && (RISK_FIELD_DEFS[risk.issueCode] ?? []).map((field) => (
               <View key={field.key} style={styles.fieldRow}>
                 <Text style={styles.fieldLabel}>{field.label}</Text>
                 <TextInput
@@ -1090,7 +1137,7 @@ export default function OwaspMobileRiskLabScreen() {
               </View>
             ))}
 
-           {risk.owasp2024 !== 'M8' && (
+           {!isRedirectOnlyCase && (
             <>
              <View style={styles.buttonRow}>
               <Pressable
@@ -1244,28 +1291,83 @@ export default function OwaspMobileRiskLabScreen() {
 
             {risk.issueCode === "PASSCODE_RATE_LIMIT_OFF" && (
               <>
-                <Text style={styles.hintText}>
-                  The API buttons above test the server-side rate limit. To see the on-device PIN brute-force demo, tap below.
-                </Text>
+
                 <Pressable
                   style={styles.demoBtn}
                   onPress={() => router.push("/scene1")}
                 >
-                  <Text style={styles.buttonText}>Demo on-device rate limit</Text>
+                  <Text style={styles.buttonText}>PASS CODE RATE LIMIT OFF (M3)</Text>
                 </Pressable>
               </>
             )}
 
             {risk.issueCode === "MISCONF_FLAG_SECURE_OFF" && (
               <>
-                <Text style={styles.hintText}>
-                  This risk is validated on-device UI behavior. Tap below to see the FLAG_SECURE demo.
-                </Text>
+
                 <Pressable
                   style={styles.demoBtn}
                   onPress={() => router.push("/flag-secure")}
                 >
-                  <Text style={styles.buttonText}>Demo FLAG_SECURE</Text>
+                  <Text style={styles.buttonText}>Demo FLAG_SECURE (M8)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "INSECURE_DATA_STORAGE" && (
+              <>
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/scene2")}
+                >
+                  <Text style={styles.buttonText}>INSECURE DATA STORAGE (M9)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "PRIVACY_CONTROLS_WEAK" && (
+              <>
+
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/scene3")}
+                >
+                  <Text style={styles.buttonText}>PRIVACY CONTROLS WEAK (M6)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {(risk.issueCode === "UNVALIDATED_EXTERNAL_INPUT" ) && (
+              <>
+
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/scene4")}
+                >
+                  <Text style={styles.buttonText}>UNVALIDATED EXTERNAL INPUT (M4)</Text>
+                </Pressable>
+              </>
+            )}
+            {(
+              risk.issueCode === "SQLI_UNION_BASED") && (
+              <>
+
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/sqlInjection")}
+                >
+                  <Text style={styles.buttonText}>SQL INJECTION (M4)</Text>
+                </Pressable>
+              </>
+            )}
+
+            {risk.issueCode === "NET_HTTP_NO_TLS" && (
+              <>
+
+                <Pressable
+                  style={styles.demoBtn}
+                  onPress={() => router.push("/insecureCommunication")}
+                >
+                  <Text style={styles.buttonText}>NET HTTP NO TLS (M5)</Text>
                 </Pressable>
               </>
             )}

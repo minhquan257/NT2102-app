@@ -10,7 +10,8 @@ import {
   View,
 } from "react-native";
 
-const BASE_URL = "https://core-service-znxz.onrender.com";
+const INSECURE_BASE_URL = "http://core-service-znxz.onrender.com";
+const SECURE_BASE_URL = "https://core-service-znxz.onrender.com";
 
 export default function M5Screen() {
   const [isSecure, setIsSecure] = useState(false);
@@ -24,11 +25,13 @@ export default function M5Screen() {
   const [requestUrl, setRequestUrl] = useState("");
   const [showCode, setShowCode] = useState(false);
 
+  const getBaseUrl = () => (isSecure ? SECURE_BASE_URL : INSECURE_BASE_URL);
+
   const runRequest = async () => {
     let postfix_url = "";
-    let method = "GET";
-    let headers = {};
-    let body = null;
+    let method: "GET" | "POST" = "GET";
+    const headers: Record<string, string> = {};
+    let body: string | undefined;
 
     if (!isSecure) {
       switch (tab) {
@@ -65,10 +68,13 @@ export default function M5Screen() {
       }
     }
 
-    setRequestUrl(`${BASE_URL}${postfix_url}`);
+    const targetBaseUrl = getBaseUrl();
+    const fullUrl = `${targetBaseUrl}${postfix_url}`;
+
+    setRequestUrl(fullUrl);
 
     try {
-      const res = await fetch(`${BASE_URL}${postfix_url}`, {
+      const res = await fetch(fullUrl, {
         method,
         headers,
         body,
@@ -77,9 +83,32 @@ export default function M5Screen() {
       const text = await res.text();
       setResult(text);
     } catch (e) {
-      setResult("Error: " + e.message);
+      const message = e instanceof Error ? e.message : String(e);
+      setResult("Error: " + message);
     }
   };
+
+  const showCodeSnippet =
+    tab === "login"
+      ? isSecure
+        ? `// SECURE (HTTPS to Render)
+POST ${SECURE_BASE_URL}/m5/safe-login
+Content-Type: application/json
+Body: { username: "${username}", password: "${password}" }`
+        : `// INSECURE (Hardcoded HTTP)
+GET ${INSECURE_BASE_URL}/m5/login?username=${username}&password=${password}`
+      : tab === "profile"
+        ? isSecure
+          ? `// SECURE (HTTPS to Render)
+GET ${SECURE_BASE_URL}/m5/me
+Authorization: Bearer ${token}`
+          : `// INSECURE (Hardcoded HTTP)
+GET ${INSECURE_BASE_URL}/m5/profile?token=${token}`
+        : isSecure
+          ? `// SECURE (HTTPS to Render)
+GET ${SECURE_BASE_URL}/m5/sensitive-data`
+          : `// INSECURE (Hardcoded HTTP)
+GET ${INSECURE_BASE_URL}/m5/sensitive-data`;
 
   const renderTab = (name: string, label: string) => (
     <TouchableOpacity
@@ -160,19 +189,7 @@ export default function M5Screen() {
       </TouchableOpacity>
 
       {showCode && (
-        <Text style={styles.code}>
-          {tab === "login" &&
-            `// ❌ INSECURE: Credentials in URL
-GET /m5/login?username=${username}&password=${password}`}
-
-          {tab === "profile" &&
-            `// ❌ INSECURE: Token in URL
-GET /m5/profile?token=${token}`}
-
-          {tab === "sensitive" &&
-            `// ❌ INSECURE: No HTTPS
-GET http://server/m5/sensitive-data`}
-        </Text>
+        <Text style={styles.code}>{showCodeSnippet}</Text>
       )}
     </ScrollView>
   );
