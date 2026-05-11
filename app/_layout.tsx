@@ -82,7 +82,6 @@ export default function Layout() {
               color: "#888", // 👈 xám đậm
               fontWeight: "600",
             },
-            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
@@ -167,7 +166,6 @@ export default function Layout() {
           options={{
             drawerLabel: "FLAG_SECURE Demo",
             title: "FLAG_SECURE Security Demo",
-            drawerItemStyle: { display: "none" },
           }}
         />
         <Drawer.Screen
